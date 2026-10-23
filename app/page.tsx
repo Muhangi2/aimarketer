@@ -1,12 +1,6 @@
-import React from 'react';
-import Link from 'next/link';
+import { redirect } from "next/navigation"
 
+// The proxy sends signed-out visitors on to /sign-in
 export default function Home() {
-  return (
-    <div>
-      hello world 
-    </div>
-  );
+  redirect("/dashboard")
 }
-
-

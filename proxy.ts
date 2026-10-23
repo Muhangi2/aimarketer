@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@insforge/sdk/ssr/middleware"
 
-const PROTECTED_PREFIXES = ["/dashboard"]
+const PROTECTED_PREFIXES = ["/dashboard", "/create-campaign"]
 const AUTH_PAGES = ["/sign-in", "/sign-up"]
 
 export async function proxy(request: NextRequest) {

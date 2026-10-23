@@ -1,4 +1,5 @@
 import { AuthForm } from "@/components/auth/auth-form"
+import { AuthShell } from "@/components/auth/auth-shell"
 
 const ERRORS: Record<string, string> = {
   oauth_failed: "Google sign-in failed. Please try again.",
@@ -14,8 +15,8 @@ export default async function SignInPage({
   const { error } = await searchParams
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-muted/40 p-4">
+    <AuthShell>
       <AuthForm mode="sign-in" initialError={error ? ERRORS[error] ?? "Sign in failed." : undefined} />
-    </main>
+    </AuthShell>
   )
 }

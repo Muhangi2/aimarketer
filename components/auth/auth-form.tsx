@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react"
 import Link from "next/link"
+import { MailCheck } from "lucide-react"
 import {
   signIn,
   signUp,
@@ -13,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Spinner } from "@/components/ui/spinner"
 
@@ -32,73 +32,81 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
   const isSignUp = mode === "sign-up"
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle className="text-xl">{isSignUp ? "Create your account" : "Welcome back"}</CardTitle>
-        <CardDescription>
-          {isSignUp ? "Sign up with Google or your email." : "Sign in with Google or your email."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <form action={signInWithGoogle}>
-          <GoogleButton />
-        </form>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isSignUp ? "Create your account" : "Welcome back"}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {isSignUp
+            ? "Start building campaigns with your AI marketing team."
+            : "Sign in to continue to your campaigns."}
+        </p>
+      </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          or
-          <span className="h-px flex-1 bg-border" />
+      <form action={signInWithGoogle}>
+        <GoogleButton />
+      </form>
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        or continue with email
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form action={formAction} className="flex flex-col gap-4">
+        {isSignUp && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="name">Full name</Label>
+            <Input id="name" name="name" autoComplete="name" placeholder="Jane Doe" className="h-10 bg-card" />
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            className="h-10 bg-card"
+            required
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete={isSignUp ? "new-password" : "current-password"}
+            placeholder={isSignUp ? "At least 6 characters" : "••••••••"}
+            className="h-10 bg-card"
+            minLength={6}
+            required
+          />
         </div>
 
-        <form action={formAction} className="flex flex-col gap-3">
-          {isSignUp && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" autoComplete="name" placeholder="Jane Doe" />
-            </div>
-          )}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isSignUp ? "new-password" : "current-password"}
-              minLength={6}
-              required
-            />
-          </div>
-
-          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-
-          <Button type="submit" size="lg" disabled={pending}>
-            {pending && <Spinner />}
-            {isSignUp ? "Create account" : "Sign in"}
-          </Button>
-        </form>
-      </CardContent>
-      <CardFooter className="justify-center text-sm text-muted-foreground">
-        {isSignUp ? (
-          <span>
-            Already have an account?{" "}
-            <Link href="/sign-in" className="text-primary underline-offset-4 hover:underline">
-              Sign in
-            </Link>
-          </span>
-        ) : (
-          <span>
-            New here?{" "}
-            <Link href="/sign-up" className="text-primary underline-offset-4 hover:underline">
-              Create an account
-            </Link>
-          </span>
+        {state.error && (
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
         )}
-      </CardFooter>
-    </Card>
+
+        <Button type="submit" className="h-10 shadow-sm shadow-primary/30" disabled={pending}>
+          {pending && <Spinner />}
+          {isSignUp ? "Create account" : "Sign in"}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        {isSignUp ? "Already have an account? " : "New to AI Marketer? "}
+        <Link
+          href={isSignUp ? "/sign-in" : "/sign-up"}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {isSignUp ? "Sign in" : "Create an account"}
+        </Link>
+      </p>
+    </div>
   )
 }
 
@@ -115,46 +123,54 @@ function VerifyEmailForm({ email, message }: { email: string; message?: string }
   const error = resendState?.error ?? state.error
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle className="text-xl">Check your email</CardTitle>
-        <CardDescription>{info ?? `Enter the 6-digit code sent to ${email}.`}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="flex flex-col items-center gap-4">
-          <input type="hidden" name="email" value={email} />
-          <input type="hidden" name="otp" value={otp} />
-          <InputOTP maxLength={6} value={otp} onChange={setOtp} autoFocus>
-            <InputOTPGroup>
-              {Array.from({ length: 6 }, (_, i) => (
-                <InputOTPSlot key={i} index={i} />
-              ))}
-            </InputOTPGroup>
-          </InputOTP>
+    <div className="flex flex-col gap-6">
+      <span className="flex size-12 items-center justify-center rounded-xl bg-accent text-primary">
+        <MailCheck className="size-6" />
+      </span>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {info ?? `Enter the 6-digit code sent to ${email}.`}
+        </p>
+      </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+      <form action={formAction} className="flex flex-col gap-5">
+        <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="otp" value={otp} />
+        <InputOTP maxLength={6} value={otp} onChange={setOtp} autoFocus containerClassName="justify-center">
+          <InputOTPGroup>
+            {Array.from({ length: 6 }, (_, i) => (
+              <InputOTPSlot key={i} index={i} className="size-11 text-base" />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
 
-          <Button type="submit" size="lg" className="w-full" disabled={pending || otp.length !== 6}>
-            {pending && <Spinner />}
-            Verify and continue
-          </Button>
-          <Button
-            type="button"
-            variant="link"
-            disabled={resending}
-            onClick={() => startResend(async () => setResendState(await resendVerification(email)))}
-          >
-            Resend code
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+
+        <Button type="submit" className="h-10 shadow-sm shadow-primary/30" disabled={pending || otp.length !== 6}>
+          {pending && <Spinner />}
+          Verify and continue
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Didn&apos;t get it?{" "}
+        <button
+          type="button"
+          disabled={resending}
+          className="font-medium text-primary underline-offset-4 hover:underline disabled:opacity-50"
+          onClick={() => startResend(async () => setResendState(await resendVerification(email)))}
+        >
+          Resend code
+        </button>
+      </p>
+    </div>
   )
 }
 
 function GoogleButton() {
   return (
-    <Button type="submit" variant="outline" size="lg" className="w-full">
+    <Button type="submit" variant="outline" className="h-10 w-full bg-card">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z" />
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
