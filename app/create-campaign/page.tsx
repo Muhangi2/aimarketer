@@ -1,5 +1,6 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
-import { LogOut } from "lucide-react"
+import { ArrowLeft, LogOut } from "lucide-react"
 import { signOut } from "@/app/actions/auth"
 import { createInsForgeServerClient } from "@/lib/insforge/server"
 import { getUserCampaign } from "@/lib/campaign"
@@ -8,13 +9,19 @@ import { CreateCampaignWizard } from "@/components/campaign/create-campaign-wiza
 import { Brand } from "@/components/brand"
 import { Button } from "@/components/ui/button"
 
-export default async function CreateCampaignPage() {
+export default async function CreateCampaignPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>
+}) {
   const insforge = await createInsForgeServerClient()
   const { data } = await insforge.auth.getCurrentUser()
   const user = data?.user
   if (!user) redirect("/sign-in")
 
-  if (await getUserCampaign(insforge, user.id)) redirect("/dashboard")
+  // Onboarding runs once; later campaigns come from the dashboard switcher (?new=1)
+  const hasCampaign = Boolean(await getUserCampaign(insforge, user.id))
+  if (hasCampaign && (await searchParams).new !== "1") redirect("/dashboard")
 
   const offices = await listOffices()
 
@@ -24,15 +31,21 @@ export default async function CreateCampaignPage() {
         <Brand />
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
-          <form action={signOut}>
-            <Button type="submit" variant="ghost" size="sm">
-              <LogOut /> Sign out
+          {hasCampaign ? (
+            <Button variant="ghost" size="sm" render={<Link href="/dashboard" />}>
+              <ArrowLeft /> Back to dashboard
             </Button>
-          </form>
+          ) : (
+            <form action={signOut}>
+              <Button type="submit" variant="ghost" size="sm">
+                <LogOut /> Sign out
+              </Button>
+            </form>
+          )}
         </div>
       </header>
       <main className="min-h-0 flex-1 p-3 sm:p-4 lg:p-6">
-        <CreateCampaignWizard userId={user.id} offices={offices} />
+        <CreateCampaignWizard userId={user.id} offices={offices} isFirst={!hasCampaign} />
       </main>
     </div>
   )
