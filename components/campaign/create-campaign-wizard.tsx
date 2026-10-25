@@ -31,7 +31,15 @@ const STEPS = [
   },
 ] as const
 
-export function CreateCampaignWizard({ userId, offices }: { userId: string; offices: Office[] }) {
+export function CreateCampaignWizard({
+  userId,
+  offices,
+  isFirst = true,
+}: {
+  userId: string
+  offices: Office[]
+  isFirst?: boolean
+}) {
   const [step, setStep] = useState<0 | 1>(0)
   const [name, setName] = useState("")
   const [icon, setIcon] = useState<IconChoice | null>(null)
@@ -175,7 +183,9 @@ export function CreateCampaignWizard({ userId, offices }: { userId: string; offi
           <p className="text-xs font-medium text-muted-foreground">
             Step {step + 1} of {STEPS.length}
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{current.heading}</h1>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+            {step === 0 && !isFirst ? "Create a new campaign" : current.heading}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">{current.description}</p>
         </header>
 
