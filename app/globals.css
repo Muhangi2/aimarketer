@@ -5,6 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    --animate-agent-float: agent-float 3.2s ease-in-out infinite;
+    @keyframes agent-float {
+        0%, 100% { translate: 0 0; }
+        50% { translate: 0 -4px; }
+    }
     --font-heading: var(--font-sans);
     --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);

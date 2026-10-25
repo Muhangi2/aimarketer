@@ -1,6 +1,7 @@
 import "server-only"
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
+import { roleForSeat, type AgentRole } from "@/lib/agent-roles"
 
 // Shape of the AgentWorld Studio export in /office-studio
 type SceneBundle = {
@@ -32,6 +33,7 @@ export type OfficeSeat = {
   height: number
   zIndex: number
   agentName: string
+  role: AgentRole
   frames: string[]
 }
 
@@ -136,6 +138,7 @@ export async function getOfficeScene(officeImage: string): Promise<OfficeScene> 
         height: character.width && character.height ? Math.round((seat.width * character.height) / character.width) : seat.width,
         zIndex: seat.zIndex,
         agentName: character.name,
+        role: roleForSeat(seatIndex),
         frames,
       }
     })
