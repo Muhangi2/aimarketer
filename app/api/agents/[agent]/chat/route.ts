@@ -1,36 +1,26 @@
-import { createInsForgeServerClient } from "@/lib/insforge/server"
 import { chatRequestSchema, streamAgentReply } from "@/lib/ai/chat"
 import { isAgentKey } from "@/lib/agent-roles"
+import { authorizeCampaign, jsonError } from "@/lib/agents/route-auth"
+import { StoreError } from "@/lib/agents/store"
 
-const json = (status: number, error: string) => Response.json({ error }, { status })
-
-// Streams an agent's reply to the signed-in user's conversation
+// Streams a regular agent's answer to a user question. Tasks only come from the Master Agent
 export async function POST(request: Request, { params }: { params: Promise<{ agent: string }> }) {
   const { agent } = await params
-  if (!isAgentKey(agent)) return json(404, "Unknown agent")
-
-  // /api routes skip the proxy, so check the session here
-  const insforge = await createInsForgeServerClient()
-  const { data } = await insforge.auth.getCurrentUser()
-  if (!data?.user) return json(401, "Not signed in")
+  if (!isAgentKey(agent)) return jsonError(404, "Unknown agent")
 
   const parsed = chatRequestSchema.safeParse(await request.json().catch(() => null))
-  if (!parsed.success) return json(400, "Invalid chat request")
-  const { campaignId, messages } = parsed.data
+  if (!parsed.success) return jsonError(400, "Invalid chat request")
+  const { campaignId, message } = parsed.data
 
-  // RLS only returns the caller's own campaigns
-  const { data: campaign } = await insforge.database
-    .from("campaign")
-    .select("name")
-    .eq("id", campaignId)
-    .maybeSingle()
-  if (!campaign) return json(404, "Campaign not found")
+  const auth = await authorizeCampaign(campaignId)
+  if ("error" in auth) return auth.error
 
   try {
     const stream = await streamAgentReply({
       agentKey: agent,
-      messages,
-      context: { campaignName: campaign.name },
+      message,
+      store: auth.store,
+      campaignName: auth.campaignName,
       signal: request.signal,
     })
     return new Response(stream, {
@@ -42,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     })
   } catch (error) {
     console.error(`Agent "${agent}" failed`, error)
-    return json(502, "The AI model is unavailable. Check that the model server is running.")
+    if (error instanceof StoreError) return jsonError(500, "Your message couldn't be saved. Please try again.")
+    return jsonError(502, "The AI model is unavailable. Check that the model server is running.")
   }
 }

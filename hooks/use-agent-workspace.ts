@@ -1,183 +1,332 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { MASTER_KEY, THREAD_KEYS, type AgentKey, type ThreadKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
-import type { ChatMessage } from "@/components/agents/agent-chat"
-import type { AgentTask } from "@/components/agents/agent-history"
+import type {
+  AgentMessage,
+  AgentRequestRecord,
+  AgentStates,
+  AgentStatus,
+  AgentTaskRecord,
+  OrchestratorEvent,
+  WorkspaceSnapshot,
+} from "@/lib/agents/types"
 
 let idCounter = 0
-const nextId = () => `${Date.now()}-${++idCounter}`
+const localId = () => `local-${Date.now()}-${++idCounter}`
 
-function greeting(seat: OfficeSeat): ChatMessage {
-  return { id: `greeting-${seat.id}`, from: "agent", text: seat.role.greeting, at: Date.now() }
-}
-
-function toggled(set: ReadonlySet<string>, id: string, on: boolean) {
+function toggled(set: ReadonlySet<ThreadKey>, key: ThreadKey, on: boolean) {
   const next = new Set(set)
-  if (on) next.add(id)
-  else next.delete(id)
+  if (on) next.add(key)
+  else next.delete(key)
   return next
 }
 
-// POSTs the conversation, refreshing the session once if the access token has expired
-async function requestReply(agentKey: string, body: string, signal: AbortSignal) {
-  const post = () =>
-    fetch(`/api/agents/${agentKey}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      signal,
-    })
+function groupMessages(messages: AgentMessage[]) {
+  const grouped = Object.fromEntries(THREAD_KEYS.map((k) => [k, [] as AgentMessage[]])) as Record<ThreadKey, AgentMessage[]>
+  for (const m of messages) grouped[m.thread]?.push(m)
+  return grouped
+}
 
-  let res = await post()
+// Sends a request, refreshing the session once if the access token has expired
+async function authedFetch(url: string, init: RequestInit) {
+  let res = await fetch(url, init)
   if (res.status === 401) {
-    const refreshed = await fetch("/api/auth/refresh", { method: "POST", signal })
-    if (refreshed.ok) res = await post()
+    const refreshed = await fetch("/api/auth/refresh", { method: "POST", signal: init.signal })
+    if (refreshed.ok) res = await fetch(url, init)
   }
   return res
 }
 
+async function errorFrom(res: Response) {
+  const { error } = await res.json().catch(() => ({ error: null }))
+  return new Error(error ?? "Something went wrong.")
+}
+
+const json = (body: unknown, signal?: AbortSignal): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+  signal,
+})
+
 /**
- * Selection, chats, tasks and pause state for the agents in an office, with replies
- * streamed from the AI agents. Shared by the AI Agent page and the Overview page.
+ * Chats, tasks and statuses for the Master Agent and the regular agents of one campaign.
+ * Starts from the saved snapshot and stays in sync with the Master Agent's streamed progress.
+ * Shared by the AI Agent page and the Overview page.
  */
-export function useAgentWorkspace(seats: OfficeSeat[], initialSeatId: string | null, campaignId: string) {
-  const [selectedId, setSelectedId] = useState(() => seats.find((s) => s.id === initialSeatId)?.id ?? null)
-  const [paused, setPaused] = useState<ReadonlySet<string>>(new Set())
-  // Agents waiting for the first words of a reply
-  const [typing, setTyping] = useState<ReadonlySet<string>>(new Set())
-  // Agents with a reply in progress
-  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
-  const [chats, setChats] = useState<Record<string, ChatMessage[]>>(() =>
-    Object.fromEntries(seats.map((s) => [s.id, [greeting(s)]]))
+export function useAgentWorkspace({
+  seats,
+  campaignId,
+  initialSelection,
+  snapshot,
+}: {
+  seats: OfficeSeat[]
+  campaignId: string
+  // "master" or a seat id (the ?agent= URL value)
+  initialSelection: string | null
+  snapshot: WorkspaceSnapshot
+}) {
+  const seatByKey = useMemo(() => new Map(seats.map((s) => [s.role.key, s] as const)), [seats])
+
+  const [selectedKey, setSelectedKey] = useState<ThreadKey | null>(() => {
+    if (initialSelection === MASTER_KEY) return MASTER_KEY
+    return seats.find((s) => s.id === initialSelection)?.role.key ?? null
+  })
+  const [messages, setMessages] = useState(() => groupMessages(snapshot.messages))
+  const [requests, setRequests] = useState<AgentRequestRecord[]>(snapshot.requests)
+  const [tasks, setTasks] = useState<Record<string, AgentTaskRecord>>(() =>
+    Object.fromEntries(snapshot.tasks.map((t) => [t.id, t]))
   )
-  const [tasks, setTasks] = useState<Record<string, AgentTask[]>>({})
-  const requests = useRef(new Map<string, AbortController>())
+  const [states, setStates] = useState<AgentStates>(snapshot.states)
+  // Agents with a reply or task in progress
+  const [typing, setTyping] = useState<ReadonlySet<ThreadKey>>(
+    () => new Set(THREAD_KEYS.filter((k) => snapshot.states[k] === "working"))
+  )
+  // Chats waiting on a request the user sent
+  const [busy, setBusy] = useState<ReadonlySet<ThreadKey>>(new Set())
+  const requestsInFlight = useRef(new Map<ThreadKey, AbortController>())
 
   useEffect(() => {
-    const pending = requests.current
+    const pending = requestsInFlight.current
     return () => pending.forEach((c) => c.abort())
   }, [])
 
-  function select(seatId: string | null) {
-    setSelectedId(seatId)
+  // ---- Local state helpers ----
+
+  function appendMessage(message: AgentMessage) {
+    setMessages((prev) => ({ ...prev, [message.thread]: [...prev[message.thread], message] }))
+  }
+
+  function updateMessage(thread: ThreadKey, id: string, patch: Partial<AgentMessage>) {
+    setMessages((prev) => ({ ...prev, [thread]: prev[thread].map((m) => (m.id === id ? { ...m, ...patch } : m)) }))
+  }
+
+  // A saved message replaces its optimistic copy, if there is one
+  function receiveMessage(message: AgentMessage) {
+    setMessages((prev) => {
+      const thread = prev[message.thread]
+      if (thread.some((m) => m.id === message.id)) return prev
+      const optimistic = thread.findIndex((m) => m.local && !m.error && m.sender === message.sender && m.content === message.content)
+      const next = optimistic === -1 ? [...thread, message] : thread.map((m, i) => (i === optimistic ? message : m))
+      return { ...prev, [message.thread]: next }
+    })
+  }
+
+  function setStatus(key: ThreadKey, status: AgentStatus) {
+    setStates((prev) => ({ ...prev, [key]: status }))
+    setTyping((prev) => toggled(prev, key, status === "working"))
+  }
+
+  function localError(thread: ThreadKey, text: string) {
+    appendMessage({
+      id: localId(),
+      thread,
+      sender: thread,
+      recipient: "user",
+      kind: "error",
+      content: text,
+      requestId: null,
+      taskId: null,
+      at: Date.now(),
+      local: true,
+      error: true,
+    })
+  }
+
+  function applyEvent(event: OrchestratorEvent) {
+    switch (event.type) {
+      case "message":
+        receiveMessage(event.message)
+        break
+      case "request":
+        setRequests((prev) =>
+          [event.request, ...prev.filter((r) => r.id !== event.request.id)].sort((a, b) => b.createdAt - a.createdAt)
+        )
+        break
+      case "task":
+        setTasks((prev) => ({ ...prev, [event.task.id]: event.task }))
+        break
+      case "agent":
+        setStatus(event.agentKey, event.status)
+        break
+    }
+  }
+
+  // ---- Actions ----
+
+  function select(key: ThreadKey | null) {
+    setSelectedKey(key)
     // Keep the selection shareable without a server round trip
     const url = new URL(window.location.href)
-    if (seatId) url.searchParams.set("agent", seatId)
+    const value = key === MASTER_KEY ? MASTER_KEY : key ? seatByKey.get(key)?.id : null
+    if (value) url.searchParams.set("agent", value)
     else url.searchParams.delete("agent")
     window.history.replaceState(null, "", url)
   }
 
-  function togglePause(seatId: string) {
-    setPaused((prev) => toggled(prev, seatId, !prev.has(seatId)))
-  }
-
-  function appendMessage(seatId: string, message: ChatMessage) {
-    setChats((prev) => ({ ...prev, [seatId]: [...(prev[seatId] ?? []), message] }))
-  }
-
-  function updateMessage(seatId: string, messageId: string, text: string) {
-    setChats((prev) => ({
-      ...prev,
-      [seatId]: (prev[seatId] ?? []).map((m) => (m.id === messageId ? { ...m, text } : m)),
-    }))
-  }
-
-  function setTaskStatus(seatId: string, taskId: string, status: AgentTask["status"]) {
-    setTasks((prev) => ({
-      ...prev,
-      [seatId]: (prev[seatId] ?? []).map((t) => (t.id === taskId ? { ...t, status } : t)),
-    }))
-  }
-
-  async function send(seat: OfficeSeat, text: string) {
-    if (busy.has(seat.id)) return
-    const isPaused = paused.has(seat.id)
-    const userMessage: ChatMessage = { id: nextId(), from: "user", text, at: Date.now() }
-    const history = [...(chats[seat.id] ?? []), userMessage]
-
-    appendMessage(seat.id, userMessage)
-    setTasks((prev) => ({
-      ...prev,
-      [seat.id]: [...(prev[seat.id] ?? []), { id: userMessage.id, text, status: isPaused ? "waiting" : "working", at: Date.now() }],
-    }))
-
-    if (isPaused) {
-      appendMessage(seat.id, {
-        id: nextId(),
-        from: "agent",
-        text: "I'm paused right now. I've saved this task and will pick it up once you resume me.",
-        at: Date.now(),
-      })
-      return
-    }
-
+  async function runMaster(body: { message: string } | { resume: true }) {
+    if (requestsInFlight.current.has(MASTER_KEY)) return
     const controller = new AbortController()
-    requests.current.set(seat.id, controller)
-    setBusy((prev) => toggled(prev, seat.id, true))
-    setTyping((prev) => toggled(prev, seat.id, true))
+    requestsInFlight.current.set(MASTER_KEY, controller)
+    setBusy((prev) => toggled(prev, MASTER_KEY, true))
+    setTyping((prev) => toggled(prev, MASTER_KEY, true))
 
-    const replyId = nextId()
+    try {
+      const res = await authedFetch("/api/agents/master/chat", json({ campaignId, ...body }, controller.signal))
+      if (!res.ok || !res.body) throw await errorFrom(res)
+
+      // Newline-delimited JSON events
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+      let buffer = ""
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += value
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            applyEvent(JSON.parse(line) as OrchestratorEvent)
+          } catch {
+            // Ignore a malformed line rather than dropping the whole stream
+          }
+        }
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return
+      localError(MASTER_KEY, `⚠️ ${error instanceof Error ? error.message : "Something went wrong."}`)
+      // The optimistic message never reached the server
+      if ("message" in body) {
+        setMessages((prev) => ({
+          ...prev,
+          [MASTER_KEY]: prev[MASTER_KEY].map((m) => (m.local && m.content === body.message ? { ...m, error: true } : m)),
+        }))
+      }
+    } finally {
+      requestsInFlight.current.delete(MASTER_KEY)
+      setBusy((prev) => toggled(prev, MASTER_KEY, false))
+      setTyping((prev) => toggled(prev, MASTER_KEY, false))
+    }
+  }
+
+  async function askAgent(key: AgentKey, text: string) {
+    const controller = new AbortController()
+    requestsInFlight.current.set(key, controller)
+    setBusy((prev) => toggled(prev, key, true))
+    setTyping((prev) => toggled(prev, key, true))
+
+    const replyId = localId()
     let reply = ""
     try {
-      const res = await requestReply(
-        seat.role.key,
-        JSON.stringify({
-          campaignId,
-          messages: history
-            .filter((m) => !m.error)
-            .map((m) => ({ role: m.from === "user" ? "user" : "assistant", content: m.text })),
-        }),
-        controller.signal
-      )
-      if (!res.ok || !res.body) {
-        const { error } = await res.json().catch(() => ({ error: null }))
-        throw new Error(error ?? "Something went wrong.")
-      }
+      const res = await authedFetch(`/api/agents/${key}/chat`, json({ campaignId, message: text }, controller.signal))
+      if (!res.ok || !res.body) throw await errorFrom(res)
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
         if (!reply) {
-          setTyping((prev) => toggled(prev, seat.id, false))
-          appendMessage(seat.id, { id: replyId, from: "agent", text: value, at: Date.now() })
+          setTyping((prev) => toggled(prev, key, false))
+          appendMessage({
+            id: replyId,
+            thread: key,
+            sender: key,
+            recipient: "user",
+            kind: "chat",
+            content: value,
+            requestId: null,
+            taskId: null,
+            at: Date.now(),
+            local: true,
+          })
         } else {
-          updateMessage(seat.id, replyId, reply + value)
+          updateMessage(key, replyId, { content: reply + value })
         }
         reply += value
       }
       if (!reply.trim()) throw new Error("The agent didn't reply. Please try again.")
-      setTaskStatus(seat.id, userMessage.id, "done")
     } catch (error) {
       if (controller.signal.aborted) return
-      setTaskStatus(seat.id, userMessage.id, "failed")
-      const message = error instanceof Error ? error.message : "Something went wrong."
-      const text = `${reply ? `${reply}\n\n` : ""}⚠️ ${message}`
-      if (reply) updateMessage(seat.id, replyId, text)
-      else appendMessage(seat.id, { id: replyId, from: "agent", text, at: Date.now(), error: true })
+      const message = `⚠️ ${error instanceof Error ? error.message : "Something went wrong."}`
+      if (reply) updateMessage(key, replyId, { content: `${reply}\n\n${message}` })
+      else localError(key, message)
     } finally {
-      requests.current.delete(seat.id)
-      setTyping((prev) => toggled(prev, seat.id, false))
-      setBusy((prev) => toggled(prev, seat.id, false))
+      requestsInFlight.current.delete(key)
+      setBusy((prev) => toggled(prev, key, false))
+      // Still working if the Master Agent has it on a task
+      setTyping((prev) => toggled(prev, key, states[key] === "working"))
     }
   }
 
-  function clearChat(seat: OfficeSeat) {
-    requests.current.get(seat.id)?.abort()
-    setChats((prev) => ({ ...prev, [seat.id]: [greeting(seat)] }))
+  function send(key: ThreadKey, text: string) {
+    if (busy.has(key)) return
+    appendMessage({
+      id: localId(),
+      thread: key,
+      sender: "user",
+      recipient: key,
+      kind: "chat",
+      content: text,
+      requestId: null,
+      taskId: null,
+      at: Date.now(),
+      local: true,
+    })
+    if (key === MASTER_KEY) void runMaster({ message: text })
+    else void askAgent(key, text)
   }
 
+  async function togglePause(key: AgentKey) {
+    const wasPaused = states[key] === "paused"
+    setStatus(key, wasPaused ? "idle" : "paused")
+    try {
+      const res = await authedFetch(`/api/agents/${key}/state`, json({ campaignId, paused: !wasPaused }))
+      if (!res.ok) throw await errorFrom(res)
+      const { resumable } = (await res.json()) as { resumable: boolean }
+      // Work the Master Agent put on hold for this agent can continue now
+      if (resumable) void runMaster({ resume: true })
+    } catch (error) {
+      setStatus(key, wasPaused ? "paused" : "idle")
+      localError(key, `⚠️ ${error instanceof Error ? error.message : "Couldn't update the agent."}`)
+    }
+  }
+
+  async function clearChat(key: ThreadKey) {
+    requestsInFlight.current.get(key)?.abort()
+    const previous = messages[key]
+    setMessages((prev) => ({ ...prev, [key]: [] }))
+    try {
+      const res = await authedFetch(`/api/agents/${key}/messages`, { ...json({ campaignId }), method: "DELETE" })
+      if (!res.ok) throw await errorFrom(res)
+    } catch (error) {
+      setMessages((prev) => ({ ...prev, [key]: previous }))
+      localError(key, `⚠️ ${error instanceof Error ? error.message : "Couldn't clear the chat."}`)
+    }
+  }
+
+  const taskList = useMemo(() => Object.values(tasks), [tasks])
+  const pausedSeatIds = useMemo(
+    () => new Set(seats.filter((s) => states[s.role.key] === "paused").map((s) => s.id)),
+    [seats, states]
+  )
+
   return {
-    selected: seats.find((s) => s.id === selectedId) ?? null,
+    selectedKey,
+    selectedSeat: selectedKey && selectedKey !== MASTER_KEY ? (seatByKey.get(selectedKey) ?? null) : null,
+    seatFor: (key: AgentKey) => seatByKey.get(key) ?? null,
     select,
-    paused,
-    togglePause,
+    messages,
+    requests,
+    tasks: taskList,
+    states,
+    pausedSeatIds,
     typing,
     busy,
-    chats,
-    tasks,
     send,
+    togglePause,
     clearChat,
   }
 }
