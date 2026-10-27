@@ -3,15 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { MASTER_KEY, THREAD_KEYS, type AgentKey, type ThreadKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
-import type {
-  AgentMessage,
-  AgentRequestRecord,
-  AgentStates,
-  AgentStatus,
-  AgentTaskRecord,
-  OrchestratorEvent,
-  WorkspaceSnapshot,
+import { DISPATCH_WINDOW_MS } from "@/lib/agents/schedule"
+import {
+  RUNNING_TASK_STATUSES,
+  type AgentMessage,
+  type AgentRequestRecord,
+  type AgentStates,
+  type AgentStatus,
+  type AgentTaskRecord,
+  type OrchestratorEvent,
+  type TaskRunRecord,
+  type WorkspaceSnapshot,
 } from "@/lib/agents/types"
+
+// Tasks run in the background (Inngest), so the workspace polls for their progress
+const ACTIVE_POLL_MS = 10_000
+const IDLE_POLL_MS = 60_000
 
 let idCounter = 0
 const localId = () => `local-${Date.now()}-${++idCounter}`
@@ -79,6 +86,7 @@ export function useAgentWorkspace({
   const [tasks, setTasks] = useState<Record<string, AgentTaskRecord>>(() =>
     Object.fromEntries(snapshot.tasks.map((t) => [t.id, t]))
   )
+  const [runs, setRuns] = useState<TaskRunRecord[]>(snapshot.runs)
   const [states, setStates] = useState<AgentStates>(snapshot.states)
   // Agents with a reply or task in progress
   const [typing, setTyping] = useState<ReadonlySet<ThreadKey>>(
@@ -166,7 +174,7 @@ export function useAgentWorkspace({
     window.history.replaceState(null, "", url)
   }
 
-  async function runMaster(body: { message: string } | { resume: true }) {
+  async function runMaster(body: { message: string }) {
     if (requestsInFlight.current.has(MASTER_KEY)) return
     const controller = new AbortController()
     requestsInFlight.current.set(MASTER_KEY, controller)
@@ -174,7 +182,8 @@ export function useAgentWorkspace({
     setTyping((prev) => toggled(prev, MASTER_KEY, true))
 
     try {
-      const res = await authedFetch("/api/agents/master/chat", json({ campaignId, ...body }, controller.signal))
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const res = await authedFetch("/api/agents/master/chat", json({ campaignId, timeZone, ...body }, controller.signal))
       if (!res.ok || !res.body) throw await errorFrom(res)
 
       // Newline-delimited JSON events
@@ -199,12 +208,10 @@ export function useAgentWorkspace({
       if (controller.signal.aborted) return
       localError(MASTER_KEY, `⚠️ ${error instanceof Error ? error.message : "Something went wrong."}`)
       // The optimistic message never reached the server
-      if ("message" in body) {
-        setMessages((prev) => ({
-          ...prev,
-          [MASTER_KEY]: prev[MASTER_KEY].map((m) => (m.local && m.content === body.message ? { ...m, error: true } : m)),
-        }))
-      }
+      setMessages((prev) => ({
+        ...prev,
+        [MASTER_KEY]: prev[MASTER_KEY].map((m) => (m.local && m.content === body.message ? { ...m, error: true } : m)),
+      }))
     } finally {
       requestsInFlight.current.delete(MASTER_KEY)
       setBusy((prev) => toggled(prev, MASTER_KEY, false))
@@ -285,9 +292,8 @@ export function useAgentWorkspace({
     try {
       const res = await authedFetch(`/api/agents/${key}/state`, json({ campaignId, paused: !wasPaused }))
       if (!res.ok) throw await errorFrom(res)
-      const { resumable } = (await res.json()) as { resumable: boolean }
-      // Work the Master Agent put on hold for this agent can continue now
-      if (resumable) void runMaster({ resume: true })
+      // Resuming dispatches the agent's overdue tasks; show them starting
+      if (wasPaused) void refresh()
     } catch (error) {
       setStatus(key, wasPaused ? "paused" : "idle")
       localError(key, `⚠️ ${error instanceof Error ? error.message : "Couldn't update the agent."}`)
@@ -307,6 +313,65 @@ export function useAgentWorkspace({
     }
   }
 
+  // ---- Background progress ----
+
+  const busyRef = useRef(busy)
+  busyRef.current = busy
+
+  /** Replaces state with the server's, keeping chats that are mid-request and local error notes. */
+  async function refresh() {
+    try {
+      const res = await authedFetch(`/api/agents/workspace?campaignId=${campaignId}`, { method: "GET" })
+      if (!res.ok) return
+      const next = (await res.json()) as WorkspaceSnapshot
+      const grouped = groupMessages(next.messages)
+      setMessages((prev) =>
+        Object.fromEntries(
+          THREAD_KEYS.map((k) => [
+            k,
+            busyRef.current.has(k) ? prev[k] : [...grouped[k], ...prev[k].filter((m) => m.local && m.error)],
+          ])
+        ) as Record<ThreadKey, AgentMessage[]>
+      )
+      setRequests(next.requests)
+      setTasks(Object.fromEntries(next.tasks.map((t) => [t.id, t])))
+      setRuns(next.runs)
+      setStates(next.states)
+      setTyping((prev) => new Set(THREAD_KEYS.filter((k) => next.states[k] === "working" || (busyRef.current.has(k) && prev.has(k)))))
+    } catch {
+      // Try again on the next tick
+    }
+  }
+
+  const taskValues = Object.values(tasks)
+  const hasActiveWork =
+    busy.size === 0 &&
+    taskValues.some(
+      (t) =>
+        RUNNING_TASK_STATUSES.includes(t.status) || (t.status === "pending" && t.scheduledAt <= Date.now() + DISPATCH_WINDOW_MS)
+    )
+  const hasScheduledWork = taskValues.some((t) => t.status === "pending")
+
+  useEffect(() => {
+    if (busy.size > 0 || (!hasActiveWork && !hasScheduledWork)) return
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh()
+    }, hasActiveWork ? ACTIVE_POLL_MS : IDLE_POLL_MS)
+    return () => window.clearInterval(timer)
+    // refresh only reads refs and stable setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveWork, hasScheduledWork, busy.size, campaignId])
+
+  // Catch up when the user comes back to the tab
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && busyRef.current.size === 0) void refresh()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId])
+
   const taskList = useMemo(() => Object.values(tasks), [tasks])
   const pausedSeatIds = useMemo(
     () => new Set(seats.filter((s) => states[s.role.key] === "paused").map((s) => s.id)),
@@ -321,6 +386,7 @@ export function useAgentWorkspace({
     messages,
     requests,
     tasks: taskList,
+    runs,
     states,
     pausedSeatIds,
     typing,

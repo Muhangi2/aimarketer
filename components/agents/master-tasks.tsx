@@ -5,7 +5,7 @@ import { Workflow } from "lucide-react"
 import { cn } from "cn"
 import { participantName, type AgentKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
-import type { AgentRequestRecord, AgentTaskRecord, RequestStatus } from "@/lib/agents/types"
+import type { AgentRequestRecord, AgentTaskRecord, RequestStatus, TaskRunRecord } from "@/lib/agents/types"
 import { AgentAvatar } from "@/components/agents/agent-avatar"
 import { TaskItem } from "@/components/agents/agent-history"
 
@@ -23,10 +23,12 @@ const REQUEST_STATUS: Record<RequestStatus, { label: string; className: string }
 export function MasterTasks({
   requests,
   tasks,
+  runs,
   seatFor,
 }: {
   requests: AgentRequestRecord[]
   tasks: AgentTaskRecord[]
+  runs: TaskRunRecord[]
   seatFor: (key: AgentKey) => OfficeSeat | null
 }) {
   if (requests.length === 0) {
@@ -91,6 +93,7 @@ export function MasterTasks({
                         title: `${participantName(task.agentKey)}: ${task.title}`,
                         instructions: after.length ? `${task.instructions}\n\nStarts after: ${after.join(", ")}` : task.instructions,
                       }}
+                      runs={runs.filter((r) => r.taskId === task.id)}
                       prefix={seat ? <AgentAvatar seat={seat} className="size-7" /> : undefined}
                     />
                   )

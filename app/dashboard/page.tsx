@@ -26,7 +26,7 @@ export default async function DashboardOverviewPage({ searchParams }: { searchPa
   const firstName = user.name.split(" ")[0]
   const [officeScene, snapshot, { agent }] = await Promise.all([
     getOfficeScene(campaign.office_image),
-    getWorkspaceSnapshot(campaign.id),
+    getWorkspaceSnapshot(campaign.id, user.id),
     searchParams,
   ])
 

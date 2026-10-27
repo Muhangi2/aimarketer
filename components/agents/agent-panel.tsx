@@ -143,9 +143,9 @@ export function AgentPanel({
         </TabsContent>
         <TabsContent value="history" className="min-h-0 overflow-y-auto">
           {isMaster ? (
-            <MasterTasks requests={workspace.requests} tasks={workspace.tasks} seatFor={workspace.seatFor} />
+            <MasterTasks requests={workspace.requests} tasks={workspace.tasks} runs={workspace.runs} seatFor={workspace.seatFor} />
           ) : (
-            <AgentHistory tasks={tasks} agentName={role.name} />
+            <AgentHistory tasks={tasks} runs={workspace.runs} agentName={role.name} />
           )}
         </TabsContent>
         {!isMaster && (

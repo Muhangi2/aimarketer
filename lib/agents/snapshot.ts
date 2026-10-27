@@ -8,13 +8,14 @@ const EMPTY: WorkspaceSnapshot = {
   messages: [],
   requests: [],
   tasks: [],
+  runs: [],
   states: Object.fromEntries(THREAD_KEYS.map((k) => [k, "idle"])) as AgentStates,
 }
 
 /** Saved chats, requests, tasks and statuses for a campaign's agent workspace. */
-export async function getWorkspaceSnapshot(campaignId: string): Promise<WorkspaceSnapshot> {
+export async function getWorkspaceSnapshot(campaignId: string, userId: string): Promise<WorkspaceSnapshot> {
   try {
-    const store = new AgentStore(await createInsForgeServerClient(), campaignId)
+    const store = new AgentStore(await createInsForgeServerClient(), campaignId, userId)
     return await store.snapshot()
   } catch (error) {
     // The page still works without history; new messages will save once the database is reachable

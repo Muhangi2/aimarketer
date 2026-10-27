@@ -1,14 +1,15 @@
 import { masterChatRequestSchema } from "@/lib/ai/chat"
 import { Orchestrator } from "@/lib/ai/orchestrator"
 import { authorizeCampaign, jsonError } from "@/lib/agents/route-auth"
+import { isValidTimeZone } from "@/lib/agents/schedule"
 import type { OrchestratorEvent } from "@/lib/agents/types"
 
 // Campaigns the Master Agent is working on in this server process; one request at a time each
 const running = new Set<string>()
 
 /**
- * Sends a message to the Master Agent (or resumes work on hold) and streams its progress as
- * newline-delimited JSON events. The work keeps going and is saved even if the browser leaves.
+ * Sends a message to the Master Agent and streams its turn (reply, question or scheduled plan) as
+ * newline-delimited JSON events. The planned tasks then run in the background through Inngest.
  */
 export async function POST(request: Request) {
   const parsed = masterChatRequestSchema.safeParse(await request.json().catch(() => null))
@@ -36,11 +37,12 @@ export async function POST(request: Request) {
           closed = true
         }
       }
-      const orchestrator = new Orchestrator(auth.store, auth.campaignName, emit)
-      const work = "resume" in body ? orchestrator.resumeWaiting() : orchestrator.handleUserMessage(body.message)
+      const timeZone = body.timeZone && isValidTimeZone(body.timeZone) ? body.timeZone : "UTC"
+      const orchestrator = new Orchestrator(auth.store, auth.campaignName, timeZone, emit)
 
-      work
-        .catch((error) => {
+      orchestrator
+        .handleUserMessage(body.message)
+        .catch((error: unknown) => {
           console.error("Master Agent crashed", error)
           emit({ type: "error", message: "The Master Agent stopped unexpectedly. Please try again." })
         })

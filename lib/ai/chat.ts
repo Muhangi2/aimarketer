@@ -15,11 +15,10 @@ export const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(4000),
 })
 
-export const masterChatRequestSchema = z.union([
-  chatRequestSchema,
-  // Sent after the user resumes a paused agent, to continue work that was on hold
-  z.object({ campaignId: z.string().uuid(), resume: z.literal(true) }),
-])
+export const masterChatRequestSchema = chatRequestSchema.extend({
+  // The user's IANA time zone, so the Master Agent schedules in local time
+  timeZone: z.string().max(64).optional(),
+})
 
 const intentSchema = z.object({ intent: z.enum(["question", "task"]) })
 

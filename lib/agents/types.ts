@@ -55,6 +55,8 @@ export type AgentRequestRecord = {
 
 export type TaskStatus =
   | "pending"
+  // Claimed for dispatch; an Inngest run is about to pick it up
+  | "queued"
   | "in_progress"
   | "in_review"
   | "needs_input"
@@ -81,6 +83,32 @@ export type AgentTaskRecord = {
   completedAt: number | null
   createdAt: number
   updatedAt: number
+  // When the task (or its next occurrence, for repeating tasks) runs
+  scheduledAt: number
+  repeatRule: RepeatRule | null
+  nextRunAt: number | null
+  runCount: number
+  queuedAt: number | null
+  lastRunAt: number | null
+}
+
+export type RepeatRule = {
+  every: number
+  unit: "hour" | "day" | "week" | "month"
+  // Stop after this many runs, or after this date (ISO)
+  count?: number
+  until?: string
+}
+
+export type TaskRunRecord = {
+  id: string
+  taskId: string
+  scheduledFor: number
+  status: "running" | "completed" | "failed" | "needs_input"
+  output: string | null
+  error: string | null
+  startedAt: number
+  finishedAt: number | null
 }
 
 export type AgentStatus = "idle" | "working" | "paused" | "error"
@@ -92,6 +120,7 @@ export type WorkspaceSnapshot = {
   messages: AgentMessage[]
   requests: AgentRequestRecord[]
   tasks: AgentTaskRecord[]
+  runs: TaskRunRecord[]
   states: AgentStates
 }
 
@@ -107,4 +136,7 @@ export type OrchestratorEvent =
 // Requests the Master Agent can still pick back up
 export const OPEN_REQUEST_STATUSES: RequestStatus[] = ["awaiting_clarification", "waiting"]
 
-export const ACTIVE_TASK_STATUSES: TaskStatus[] = ["pending", "in_progress", "in_review", "needs_input"]
+export const ACTIVE_TASK_STATUSES: TaskStatus[] = ["pending", "queued", "in_progress", "in_review", "needs_input"]
+
+// Statuses an Inngest run is working on right now
+export const RUNNING_TASK_STATUSES: TaskStatus[] = ["queued", "in_progress", "in_review"]

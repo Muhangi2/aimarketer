@@ -118,7 +118,7 @@ The Master Agent has assigned you a task for the campaign "${campaignName}".
 Rules:
 1. Do the task, staying within your responsibilities. Deliver the finished work, not a description of what you would do.
 2. Build on the teammates' work you are given.
-3. If you truly cannot do the task without a fact only the user knows, reply with a single line that starts with "${QUESTION_PREFIX}" followed by one short question for the Master Agent. Otherwise make reasonable assumptions and state them briefly.
+3. If you truly cannot do the task without a fact only the user knows (for example a product detail or a date), reply with a single line that starts with "${QUESTION_PREFIX}" followed by one short question for the Master Agent. Never ask for metrics, follower counts or other performance data: work without them and say what to track instead. Otherwise make reasonable assumptions and state them briefly.
 4. Never invent real performance numbers and never claim to have browsed, posted or scheduled anything.
 5. ${STYLE}
 6. Keep it under 300 words.`

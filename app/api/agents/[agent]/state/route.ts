@@ -1,10 +1,11 @@
 import { z } from "zod"
 import { isAgentKey } from "@/lib/agent-roles"
 import { authorizeCampaign, jsonError } from "@/lib/agents/route-auth"
+import { dispatchDueTasks } from "@/lib/agents/dispatch"
 
 const bodySchema = z.object({ campaignId: z.string().uuid(), paused: z.boolean() })
 
-// Pauses or resumes a regular agent. Reports whether the Master Agent has work on hold to continue
+// Pauses or resumes a regular agent. On resume, its overdue tasks are dispatched right away
 export async function POST(request: Request, { params }: { params: Promise<{ agent: string }> }) {
   const { agent } = await params
   if (!isAgentKey(agent)) return jsonError(404, "Unknown agent")
@@ -18,8 +19,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
 
   try {
     const status = await auth.store.setState(agent, paused ? "paused" : "idle", null, true)
-    const open = paused ? null : await auth.store.getOpenRequest()
-    return Response.json({ status, resumable: open?.status === "waiting" })
+    const dispatched = paused ? [] : await dispatchDueTasks(auth.store, undefined, agent)
+    return Response.json({ status, dispatched: dispatched.length })
   } catch (error) {
     console.error(`Could not update ${agent} status`, error)
     return jsonError(500, "Couldn't update the agent. Please try again.")

@@ -16,5 +16,5 @@ export async function authorizeCampaign(campaignId: string) {
   const { data: campaign } = await insforge.database.from("campaign").select("id, name").eq("id", campaignId).maybeSingle()
   if (!campaign) return { error: jsonError(404, "Campaign not found") } as const
 
-  return { store: new AgentStore(insforge, campaignId), campaignName: String(campaign.name) } as const
+  return { store: new AgentStore(insforge, campaignId, data.user.id), campaignName: String(campaign.name) } as const
 }

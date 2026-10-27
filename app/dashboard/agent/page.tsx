@@ -7,7 +7,7 @@ export default async function AgentPage({ searchParams }: { searchParams: Promis
   const { user, activeCampaign } = await getDashboardContext()
   const [scene, snapshot, { agent }] = await Promise.all([
     getOfficeScene(activeCampaign.office_image),
-    getWorkspaceSnapshot(activeCampaign.id),
+    getWorkspaceSnapshot(activeCampaign.id, user.id),
     searchParams,
   ])
 
