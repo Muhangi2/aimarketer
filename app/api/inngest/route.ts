@@ -1,15 +1,9 @@
-import { serve } from 'inngest/next';
-import { inngest } from '@/lib/inngest/client';
-import {
-  processTaskBackgroundJob,
-  dailySyncScheduledJob,
-} from '@/lib/inngest/functions';
+import { serve } from "inngest/next"
+import { inngest } from "@/lib/inngest/client"
+import { functions } from "@/lib/inngest/functions"
 
-// Create an API route that serves Inngest functions
-export const { GET, POST, PUT } = serve({
-  client: inngest,
-  functions: [
-    processTaskBackgroundJob,
-    dailySyncScheduledJob,
-  ],
-});
+// Inngest calls this route to run the agent task functions (locally: npm run inngest:dev)
+export const { GET, POST, PUT } = serve({ client: inngest, functions })
+
+// Agent runs can take a few minutes on a local model
+export const maxDuration = 300

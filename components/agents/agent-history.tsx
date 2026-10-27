@@ -1,22 +1,117 @@
-import { formatDistanceToNow } from "date-fns"
-import { ClipboardList } from "lucide-react"
+"use client"
+
+import { format, formatDistanceToNow } from "date-fns"
+import { CalendarClock, ChevronDown, ClipboardList, Repeat } from "lucide-react"
 import { cn } from "cn"
+import { describeRepeat, formatWhen } from "@/lib/agents/schedule"
+import type { AgentTaskRecord, TaskRunRecord, TaskStatus } from "@/lib/agents/types"
 
-export type AgentTask = {
-  id: string
-  text: string
-  status: "working" | "done" | "failed" | "waiting"
-  at: number
+const RUN_STATUS: Record<TaskRunRecord["status"], string> = {
+  running: "Running",
+  completed: "Done",
+  failed: "Failed",
+  needs_input: "Needed input",
 }
 
-const STATUS: Record<AgentTask["status"], { label: string; className: string }> = {
-  working: { label: "Working…", className: "bg-blue-500/12 text-blue-700 dark:text-blue-300" },
-  done: { label: "Answered", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400" },
-  failed: { label: "Failed", className: "bg-destructive/10 text-destructive" },
-  waiting: { label: "Waiting · agent paused", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+export const TASK_STATUS: Record<TaskStatus, { label: string; className: string; dot: string }> = {
+  pending: { label: "Scheduled", className: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
+  queued: { label: "Starting…", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300", dot: "bg-sky-500 animate-pulse" },
+  in_progress: { label: "Working…", className: "bg-blue-500/12 text-blue-700 dark:text-blue-300", dot: "bg-blue-500 animate-pulse" },
+  in_review: { label: "In review", className: "bg-violet-500/12 text-violet-700 dark:text-violet-300", dot: "bg-violet-500 animate-pulse" },
+  needs_input: { label: "Needs your input", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  completed: { label: "Done", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
+  failed: { label: "Failed", className: "bg-destructive/10 text-destructive", dot: "bg-destructive" },
+  blocked: { label: "Skipped", className: "bg-destructive/10 text-destructive", dot: "bg-destructive/60" },
+  cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/40" },
 }
 
-export function AgentHistory({ tasks, agentName }: { tasks: AgentTask[]; agentName: string }) {
+export function TaskStatusBadge({ status }: { status: TaskStatus }) {
+  return (
+    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", TASK_STATUS[status].className)}>
+      {TASK_STATUS[status].label}
+    </span>
+  )
+}
+
+/** A task with its instructions and delivered work, expandable. */
+export function TaskItem({
+  task,
+  runs = [],
+  prefix,
+}: {
+  task: AgentTaskRecord
+  // Past runs, for repeating tasks
+  runs?: TaskRunRecord[]
+  prefix?: React.ReactNode
+}) {
+  const upcoming = task.status === "pending" || task.status === "queued"
+  return (
+    <li className="rounded-xl border bg-background">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-start gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
+          {prefix ?? <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TASK_STATUS[task.status].dot)} />}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{task.title}</p>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" suppressHydrationWarning>
+              {upcoming ? (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarClock className="size-3" />
+                  {task.runCount > 0 ? "Next run" : "Runs"} {formatWhen(task.scheduledAt)}
+                </span>
+              ) : (
+                <span>{formatDistanceToNow(task.updatedAt || task.createdAt, { addSuffix: true })}</span>
+              )}
+              {task.repeatRule && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-1.5 py-px text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                  <Repeat className="size-2.5" /> {describeRepeat(task.repeatRule)}
+                  {task.runCount > 0 && ` · ran ${task.runCount}×`}
+                </span>
+              )}
+              {task.attempts > 1 && <span>{task.attempts} attempts</span>}
+            </p>
+          </div>
+          <TaskStatusBadge status={task.status} />
+          <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-3 border-t px-3.5 py-3 text-xs leading-relaxed">
+          <div>
+            <p className="font-semibold text-muted-foreground">Instructions</p>
+            <p className="mt-1 whitespace-pre-line">{task.instructions}</p>
+          </div>
+          {task.output && (
+            <div>
+              <p className="font-semibold text-muted-foreground">Delivered work</p>
+              <p className="mt-1 whitespace-pre-line">{task.output}</p>
+            </div>
+          )}
+          {task.reviewFeedback && (
+            <div>
+              <p className="font-semibold text-muted-foreground">Master Agent review</p>
+              <p className="mt-1 whitespace-pre-line">{task.reviewFeedback}</p>
+            </div>
+          )}
+          {runs.length > 0 && (
+            <div>
+              <p className="font-semibold text-muted-foreground">Past runs</p>
+              <ul className="mt-1 space-y-1">
+                {runs.slice(0, 5).map((run) => (
+                  <li key={run.id} className="flex items-center justify-between gap-3" suppressHydrationWarning>
+                    <span>{format(run.scheduledFor, "EEE, MMM d · h:mm a")}</span>
+                    <span className={cn(run.status === "failed" && "text-destructive")}>{RUN_STATUS[run.status]}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {task.error && <p className="text-destructive">{task.error}</p>}
+        </div>
+      </details>
+    </li>
+  )
+}
+
+/** Tasks the Master Agent assigned to one regular agent, newest first. */
+export function AgentHistory({ tasks, runs = [], agentName }: { tasks: AgentTaskRecord[]; runs?: TaskRunRecord[]; agentName: string }) {
   if (tasks.length === 0) {
     return (
       <div className="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-300">
@@ -25,7 +120,7 @@ export function AgentHistory({ tasks, agentName }: { tasks: AgentTask[]; agentNa
         </span>
         <p className="mt-6 text-sm font-semibold">No tasks yet</p>
         <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-          Tasks you give the {agentName} in Chat will appear here with their status.
+          Tasks the Master Agent assigns to the {agentName} will appear here with their status and results.
         </p>
       </div>
     )
@@ -33,18 +128,11 @@ export function AgentHistory({ tasks, agentName }: { tasks: AgentTask[]; agentNa
 
   return (
     <ol className="flex flex-col gap-2 py-4 animate-in fade-in duration-300">
-      {[...tasks].reverse().map((task) => (
-        <li key={task.id} className="flex items-start gap-3 rounded-xl border bg-background p-3.5">
-          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm">{task.text}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{formatDistanceToNow(task.at, { addSuffix: true })}</p>
-          </div>
-          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS[task.status].className)}>
-            {STATUS[task.status].label}
-          </span>
-        </li>
-      ))}
+      {[...tasks]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map((task) => (
+          <TaskItem key={task.id} task={task} runs={runs.filter((r) => r.taskId === task.id)} />
+        ))}
     </ol>
   )
 }
