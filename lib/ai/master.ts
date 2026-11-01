@@ -1,7 +1,8 @@
 import "server-only"
 import { z } from "zod"
 import { AGENT_KEYS, type AgentKey } from "@/lib/agent-roles"
-import { ROLES } from "@/lib/ai/agents"
+import { ROLES, USER_UPDATE_PREFIX } from "@/lib/ai/agents"
+export { USER_UPDATE_PREFIX }
 import { completeJSON, completeText } from "@/lib/ai/llm"
 import {
   DISPATCH_WINDOW_MS,
@@ -55,14 +56,49 @@ const plannedTask = z.object({
   repeat: repeatRuleSchema.nullable().optional(),
 })
 
-export const decisionSchema = z.object({
-  action: z.enum(["reply", "clarify", "plan", "resume"]),
-  message: z.string().trim().min(1).max(3000),
-  tasks: z.array(plannedTask).max(MAX_TASKS_PER_PLAN).default([]),
+// Extra details the user gave for a task that is already assigned
+const taskUpdate = z.object({
+  task: z.string().min(1).max(20),
+  addition: z.string().trim().min(1).max(2000),
 })
+
+const ACTIONS = ["reply", "clarify", "plan", "resume", "update"] as const
+
+/**
+ * Small models sometimes return an action that isn't on the list: a different case, the whole
+ * template ("reply | plan | ..."), or a word of their own like "research". Work out what they meant
+ * from the rest of the answer instead of failing the turn.
+ */
+function normalizeDecision(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
+  const answer = { ...(raw as Record<string, unknown>) }
+  const action = typeof answer.action === "string" ? answer.action.trim().toLowerCase() : ""
+  const hasItems = (key: string) => Array.isArray(answer[key]) && (answer[key] as unknown[]).length > 0
+  if ((ACTIONS as readonly string[]).includes(action)) answer.action = action
+  else if (hasItems("updates")) answer.action = "update"
+  else if (hasItems("tasks")) answer.action = "plan"
+  else if (action.includes("clarif") || action.includes("question")) answer.action = "clarify"
+  else answer.action = "reply"
+  return answer
+}
+
+export const decisionSchema = z.preprocess(
+  normalizeDecision,
+  z.object({
+    action: z.enum(ACTIONS),
+    message: z.string().trim().min(1).max(3000),
+    tasks: z.array(plannedTask).max(MAX_TASKS_PER_PLAN).default([]),
+    updates: z.array(taskUpdate).max(MAX_TASKS_PER_PLAN * 2).default([]),
+  })
+)
 
 export type Decision = z.infer<typeof decisionSchema>
 export type PlannedTask = z.infer<typeof plannedTask>
+
+// Short refs ("a1", "a2"...) for assigned tasks: easier for the model than database ids
+export function activeTaskRefs(tasks: AgentTaskRecord[]) {
+  return new Map(tasks.map((t, i) => [`a${i + 1}`, t]))
+}
 
 export async function decide({
   campaignName,
@@ -73,6 +109,7 @@ export async function decide({
   states,
   timeZone,
   upcoming,
+  activeTasks = [],
   signal,
 }: {
   campaignName: string
@@ -84,6 +121,8 @@ export async function decide({
   timeZone: string
   // Tasks already scheduled, so new work is spread around them
   upcoming: AgentTaskRecord[]
+  // Tasks already assigned and not finished, which new details from the user can update
+  activeTasks?: AgentTaskRecord[]
   signal?: AbortSignal
 }): Promise<Decision> {
   const pending = openRequest
@@ -103,28 +142,39 @@ export async function decide({
     .map((t) => `- ${formatWhen(t.scheduledAt, timeZone)}: ${t.agentKey}, "${t.title}"${t.repeatRule ? ` (${describeRepeat(t.repeatRule).toLowerCase()})` : ""}`)
     .join("\n")
 
+  const refs = activeTaskRefs(activeTasks)
+  const assigned = [...refs]
+    .map(([ref, t]) => `- ${ref}: ${t.agentKey}, "${t.title}" (${t.status.replace(/_/g, " ")}). Instructions: ${t.instructions.slice(0, 600)}`)
+    .join("\n")
+
   const system = `${identity(campaignName)}
 
 Your agents (use these exact keys):
 ${teamList(states)}
 
 Decide how to handle the user's latest message. Reply with only a JSON object:
-{"action": "reply" | "clarify" | "plan" | "resume", "message": "...", "tasks": [{"id": "t1", "agent": "research", "title": "...", "instructions": "...", "dependsOn": [], "runAt": "now", "repeat": null}]}
+{"action": "plan", "message": "...", "tasks": [{"id": "t1", "agent": "research", "title": "...", "instructions": "...", "dependsOn": [], "runAt": "now", "repeat": null}], "updates": [{"task": "a1", "addition": "..."}]}
+"action" is exactly one of: "reply", "clarify", "plan", "resume", "update". "updates" is [] unless the action is "update".
 
 - "reply": greetings, small talk, or questions about the team, its status or past work. "message" is your answer. "tasks" is [].
-- "clarify": the user wants work done but it is too vague to plan and you cannot reasonably assume the missing detail. "message" is one short, specific question. "tasks" is [].
+- "clarify": the user wants work done but it is too vague to plan and you cannot reasonably assume the missing detail. "message" is one short, specific question. "tasks" is []. Ask at most one clarifying question per request: once the user has answered, "plan" the work and fill any remaining gaps with reasonable assumptions.
 - "plan": the user wants work done. "message" briefly tells the user your plan. "tasks" has 1 to ${MAX_TASKS_PER_PLAN} tasks in the order they should run, each for exactly one agent and only within that agent's area. Use only the agents the request needs. "dependsOn" lists the ids of earlier tasks whose output the task needs (for example the Creator writing posts about the Research Agent's ideas). Each task's "instructions" must be specific and self-contained, including the platform, goal and any details the user gave.
   Scheduling: you decide when each task runs. "runAt" is "now" or {"daysFromToday": 0-90, "time": "HH:MM"} in the user's local time (24h). Use "now" for work the user wants right away; otherwise spread tasks out sensibly: research first, content after the research it uses, posting-related work at good times for the platform (for example weekday mornings or evenings), and no more than ${MAX_TASKS_PER_AGENT_PER_DAY} tasks per agent per day. Avoid times already taken in the schedule below.
   "repeat" is null, or for recurring work (only when the user asks for it, e.g. "every Monday", "daily"): {"every": 1, "unit": "hour" | "day" | "week" | "month", "count": optional number of runs}. The first run happens at "runAt".
+- "update": the user adds details, corrections or preferences (a product name, audience, tone, platform, date, link, "make it shorter"...) for work already assigned in "Tasks already assigned" below. Never create new tasks for this: "tasks" is [] and "updates" lists each assigned task the details affect, with its ref (for example "a1") and an "addition" that states the new details clearly and completely so the agent can act on them. "message" briefly tells the user which agents you passed the details to. Use "plan" only when the user asks for different, new work that no assigned task covers.
 - "resume": only when you were waiting on the user (see below) and they answered or asked you to continue. "message" acknowledges it. "tasks" is [].
-Only plan social media marketing work. If the request is unrelated, use "reply" and say you only help with this campaign's social media.${pending}${past ? `\n\nRecent work by the team:\n${past}` : ""}
+Agent tools: the Research Agent works from its own knowledge first and uses its computer's web browser (Google, YouTube, Instagram, TikTok, X, LinkedIn and other platforms) when live or in-depth research is needed; it saves each finding with its sources to the database. The Creator Agent writes posts, captions, hashtags and content ideas, generates images (Gemini), transforms them (ImageKit: background removal, resizing for a platform, text overlays...) and saves every piece as a draft in the database. They pick their own tools: describe the outcome you want (platform, format, number of posts, whether images are needed), not which tools to use.
+Using the web: when a task needs live information (what is trending now, recent news, a competitor's latest posts, current platform changes), say so in its instructions, e.g. "Check the web for what is trending this week." If the user says not to browse or to use only what the agents already know, write "Do not use the browser for this task." in the instructions of the affected tasks. If a site needs the user to log in, the agent asks the user itself.
+Scope: any request about social media content, trends, hashtags, platforms, posting, competitors or audiences is in scope and should be planned, even if its topic differs from the campaign's name (for example football trends on Instagram for any campaign). Only refuse requests that are clearly not social media marketing, such as writing code, homework or general trivia: then use "reply" and say in one sentence that you only help with this campaign's social media. If the user pushes back on a refusal, re-evaluate the request and plan it if it is in scope instead of repeating yourself.${pending}${past ? `\n\nRecent work by the team:\n${past}` : ""}
 
 Current time for the user: ${new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "full", timeStyle: "short" }).format(Date.now())} (${timeZone}).
 Already scheduled:
-${schedule || "- nothing"}`
+${schedule || "- nothing"}${assigned ? `\n\nTasks already assigned (not finished yet):\n${assigned}` : ""}`
 
   const conversation = history
     .filter((m) => !m.error && (m.sender === "user" || m.sender === "master"))
+    // Drop past refusals so the model doesn't copy them on the next turn
+    .filter((m) => !(m.sender === "master" && /only help with this campaign's social media/i.test(m.content)))
     .slice(-10)
     .map((m) => ({ role: m.sender === "user" ? ("user" as const) : ("assistant" as const), content: m.content }))
 
@@ -134,6 +184,19 @@ ${schedule || "- nothing"}`
     { signal }
   )
   if (decision.action === "resume" && !openRequest) return { ...decision, action: "reply" }
+  if (decision.action === "update") {
+    const updates = decision.updates.filter((u) => refs.has(u.task))
+    // Nothing valid to update: plan the work instead if the model also gave tasks
+    if (updates.length === 0) return {
+      ...decision,
+      action: decision.tasks.length > 0 ? "plan" : "reply",
+      message: decision.tasks.length > 0
+        ? "I couldn't match those details to an assigned task. I'll plan the work instead."
+        : "I couldn't match those details to an assigned task. Please tell me which task you meant.",
+      updates: [],
+    }
+    return { ...decision, tasks: [], updates }
+  }
   return decision
 }
 
@@ -255,19 +318,37 @@ export async function reviewOutput({
   campaignName,
   task,
   output,
+  evidence,
   signal,
 }: {
   campaignName: string
   task: AgentTaskRecord
   output: string
+  // For agents with a computer: the pages it really opened and the files it made
+  evidence?: string | null
   signal?: AbortSignal
 }) {
+  const computerCheck = evidence
+    ? ` This agent has its own computer; its log is included below. If the work claims fresh or current information (today's trends, news, a competitor's latest posts) but the log shows no pages were opened, reject it and ask the agent to check the web. Don't require browsing for work the agent can do well from its own knowledge (for example writing captions from a teammate's research), or when the instructions say not to use the browser.${
+        task.agentKey === "creator"
+          ? " The Creator Agent must save each post, caption or idea it delivers as a content draft: if the log shows no drafts were saved, reject it and ask it to save them with save_content_draft. If the instructions asked for images and the log shows none, ask for them."
+          : task.agentKey === "research"
+            ? " The Research Agent must save its main findings to the database: if the log shows none were saved, reject it and ask it to save them with save_research_finding."
+            : ""
+      }`
+    : ""
+  const updated = task.instructions.includes(USER_UPDATE_PREFIX)
+    ? ` The instructions include details the user added after the task was assigned ("${USER_UPDATE_PREFIX}"); they take priority over earlier instructions. If the work ignores them, reject it and tell the agent exactly what to change.`
+    : ""
   const system = `${identity(campaignName)}
-Review the work the ${ROLES[task.agentKey].name} delivered. Approve it if it completes the task instructions, stays in the agent's area and is usable. Reject it only for clear problems: it is off-task, misses a major part of the instructions, describes work instead of doing it, or invents performance data. When rejecting, give short, specific feedback the agent can act on.
+Review the work the ${ROLES[task.agentKey].name} delivered. Approve it if it completes the task instructions, stays in the agent's area and is usable. Reject it only for clear problems: it is off-task, misses a major part of the instructions, describes work instead of doing it, or invents performance data. When rejecting, give short, specific feedback the agent can act on.${updated}${computerCheck}
 Reply with only a JSON object: {"approved": true, "feedback": ""}`
   return completeJSON(reviewSchema, [
     { role: "system", content: system },
-    { role: "user", content: `Task: ${task.title}\nInstructions: ${task.instructions}\n\nDelivered work:\n${output}` },
+    {
+      role: "user",
+      content: `Task: ${task.title}\nInstructions: ${task.instructions}\n\nDelivered work:\n${output}${evidence ? `\n\nComputer log:\n${evidence}` : ""}`,
+    },
   ], { signal })
 }
 
@@ -292,7 +373,7 @@ export async function summarize({
     })
     .join("\n\n")
   const system = `${identity(campaignName)}
-Your team has finished the user's request. Write your reply to the user: present the finished deliverables (keep the agents' actual content such as captions, ideas or calendars, condensed where needed, and say which agent made what), then mention any task that failed or was skipped and what the user can do about it. ${STYLE} Keep it under 400 words.`
+Your team has finished the user's request. Write your reply to the user: present the finished deliverables (keep the agents' actual content such as captions, ideas or calendars, condensed where needed, and say which agent made what). Copy every image and file URL from the results exactly as given, each on its own line, so the user can see them; mention that drafts and findings are saved, then mention any task that failed or was skipped and what the user can do about it. ${STYLE} Keep it under 400 words.`
   return completeText(
     [
       { role: "system", content: system },

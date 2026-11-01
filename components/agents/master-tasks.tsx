@@ -3,9 +3,9 @@
 import { formatDistanceToNow } from "date-fns"
 import { Workflow } from "lucide-react"
 import { cn } from "cn"
-import { participantName, type AgentKey } from "@/lib/agent-roles"
+import { isComputerAgent, participantName, type AgentKey, type ComputerAgentKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
-import type { AgentRequestRecord, AgentTaskRecord, RequestStatus, TaskRunRecord } from "@/lib/agents/types"
+import type { AgentRequestRecord, AgentTaskRecord, ArtifactRecord, RequestStatus, TaskRunRecord } from "@/lib/agents/types"
 import { AgentAvatar } from "@/components/agents/agent-avatar"
 import { TaskItem } from "@/components/agents/agent-history"
 
@@ -24,12 +24,17 @@ export function MasterTasks({
   requests,
   tasks,
   runs,
+  artifacts = [],
   seatFor,
+  onHelp,
 }: {
   requests: AgentRequestRecord[]
   tasks: AgentTaskRecord[]
   runs: TaskRunRecord[]
+  artifacts?: ArtifactRecord[]
   seatFor: (key: AgentKey) => OfficeSeat | null
+  // Opens an agent's computer, for tasks waiting for the user
+  onHelp?: (key: ComputerAgentKey) => void
 }) {
   if (requests.length === 0) {
     return (
@@ -94,6 +99,8 @@ export function MasterTasks({
                         instructions: after.length ? `${task.instructions}\n\nStarts after: ${after.join(", ")}` : task.instructions,
                       }}
                       runs={runs.filter((r) => r.taskId === task.id)}
+                      artifacts={artifacts.filter((a) => a.taskId === task.id)}
+                      onHelp={onHelp && isComputerAgent(task.agentKey) ? () => onHelp(task.agentKey as ComputerAgentKey) : undefined}
                       prefix={seat ? <AgentAvatar seat={seat} className="size-7" /> : undefined}
                     />
                   )

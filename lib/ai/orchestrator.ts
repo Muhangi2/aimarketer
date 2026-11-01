@@ -1,6 +1,6 @@
 import "server-only"
 import { MASTER_KEY, type ThreadKey } from "@/lib/agent-roles"
-import { decide, describePlan, normalizePlan, type Decision } from "@/lib/ai/master"
+import { USER_UPDATE_PREFIX, activeTaskRefs, decide, describePlan, normalizePlan, type Decision } from "@/lib/ai/master"
 import { dispatchDueTasks } from "@/lib/agents/dispatch"
 import type { AgentStore, NewMessage, RequestPatch, TaskPatch } from "@/lib/agents/store"
 import {
@@ -50,6 +50,7 @@ export class Orchestrator {
         this.store.listUpcomingTasks(Date.now() + SCHEDULE_LOOKAHEAD_MS),
       ])
       const openTasks = open ? await this.store.listTasks(open.id) : []
+      const activeTasks = await this.store.listActiveTasks()
       const decision = await decide({
         campaignName: this.campaignName,
         history: history.filter((m) => m.id !== userMessage.id),
@@ -59,6 +60,7 @@ export class Orchestrator {
         states,
         timeZone: this.timeZone,
         upcoming,
+        activeTasks,
       })
 
       switch (decision.action) {
@@ -80,6 +82,16 @@ export class Orchestrator {
             request = await this.createRequest(text, "awaiting_clarification", decision.message)
           }
           await this.say(decision.message, "clarification", request.id)
+          break
+        }
+
+        case "update": {
+          const refs = activeTaskRefs(activeTasks)
+          const updated = await this.applyUpdates(
+            decision.updates.map((u) => ({ task: refs.get(u.task)!, addition: u.addition }))
+          )
+          requestId = updated[0]?.requestId ?? null
+          await this.say(decision.message, "update", requestId)
           break
         }
 
@@ -154,6 +166,35 @@ export class Orchestrator {
   }
 
   // ---- State changes ----
+
+  /**
+   * The user added details for work already assigned: they go into the existing tasks' instructions
+   * instead of new tasks. Tasks that haven't started pick them up when they run; a task that is
+   * already running gets them in its review (see reviewOutput) and its next attempt.
+   */
+  private async applyUpdates(updates: { task: AgentTaskRecord; addition: string }[]) {
+    const byTask = new Map<string, { task: AgentTaskRecord; additions: string[] }>()
+    for (const { task, addition } of updates) {
+      const entry = byTask.get(task.id) ?? { task, additions: [] }
+      entry.additions.push(addition)
+      byTask.set(task.id, entry)
+    }
+    const updated: AgentTaskRecord[] = []
+    for (const { task, additions } of byTask.values()) {
+      const note = `${USER_UPDATE_PREFIX} ${additions.join(" ")}`
+      updated.push(await this.patchTask(task.id, { instructions: `${task.instructions}\n\n${note}` }))
+      await this.post({
+        thread: task.agentKey,
+        sender: MASTER_KEY,
+        recipient: task.agentKey,
+        kind: "update",
+        content: `New details for "${task.title}". ${note}`,
+        requestId: task.requestId,
+        taskId: task.id,
+      })
+    }
+    return updated
+  }
 
   // The user answered the agents' questions: those tasks run again now, with the answer
   private async applyUserAnswer(request: AgentRequestRecord, tasks: AgentTaskRecord[], answer: string) {

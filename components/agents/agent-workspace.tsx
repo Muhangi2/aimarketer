@@ -8,7 +8,9 @@ import { useAgentWorkspace } from "@/hooks/use-agent-workspace"
 import { AgentAvatar } from "@/components/agents/agent-avatar"
 import { AgentPanel } from "@/components/agents/agent-panel"
 import { MasterAgentCard } from "@/components/agents/master-agent-card"
-import { AgentStatusBadge } from "@/components/agents/participant-avatar"
+import { LiveActivity, LiveStatusBadge } from "@/components/agents/live-status-badge"
+import { EndCampaignButton } from "@/components/campaign/end-campaign-button"
+import { ComputerViewer } from "@/components/computers/computer-viewer"
 import { AgentOfficePanel } from "@/components/office/agent-office-panel"
 
 export function AgentWorkspace({
@@ -32,11 +34,14 @@ export function AgentWorkspace({
   return (
     <div className="grid gap-6 p-4 sm:p-6 lg:h-full lg:grid-cols-2 lg:p-8">
       <div className="flex min-w-0 flex-col gap-5 lg:min-h-0">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">AI Agents</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Give requests to the Master Agent. It plans the work, assigns it to your agents and reviews the results.
-          </p>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-semibold tracking-tight">AI Agents</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Give requests to the Master Agent. It plans the work, assigns it to your agents and reviews the results.
+            </p>
+          </div>
+          <EndCampaignButton workspace={workspace} />
         </div>
 
         <div role="tablist" aria-label="Agents" className="flex shrink-0 flex-col gap-2.5">
@@ -50,6 +55,7 @@ export function AgentWorkspace({
           >
             {seats.map((seat) => {
               const active = seat.role.key === selectedKey
+              const live = workspace.statusFor(seat.role.key)
               return (
                 <button
                   key={seat.id}
@@ -67,7 +73,8 @@ export function AgentWorkspace({
                   <AgentAvatar seat={seat} className="size-10" />
                   <span className="min-w-0">
                     <span className="line-clamp-2 text-[13px] leading-tight font-semibold">{seat.role.name}</span>
-                    <AgentStatusBadge status={workspace.states[seat.role.key]} className="mt-1" />
+                    <LiveStatusBadge status={live} className="mt-1" />
+                    <LiveActivity status={live} className="mt-0.5 max-w-36 text-[10px]" />
                   </span>
                   {/* Popover pointer linking the selected card to the panel below */}
                   {active && (
@@ -101,9 +108,11 @@ export function AgentWorkspace({
             if (seat) workspace.select(seat.role.key)
           }}
           pausedSeatIds={workspace.pausedSeatIds}
+          seatStatus={(seat) => workspace.statusFor(seat.role.key)}
           className="lg:h-full"
         />
       </div>
+      <ComputerViewer workspace={workspace} />
     </div>
   )
 }

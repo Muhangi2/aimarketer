@@ -1,12 +1,15 @@
 import "server-only"
-import { MASTER_KEY } from "@/lib/agent-roles"
+import { MASTER_KEY, isComputerAgent, type ComputerAgentKey } from "@/lib/agent-roles"
 import { QUESTION_PREFIX, ROLES, taskPrompt, taskSystemPrompt } from "@/lib/ai/agents"
 import { completeText } from "@/lib/ai/llm"
 import { answerAgentQuestion, reviewOutput, summarize } from "@/lib/ai/master"
 import { dispatchDueTasks } from "@/lib/agents/dispatch"
+import { OutputStore } from "@/lib/agents/outputs"
 import { nextOccurrence } from "@/lib/agents/schedule"
 import { AgentStore, type NewMessage } from "@/lib/agents/store"
-import type { AgentTaskRecord, MessageKind, TaskStatus } from "@/lib/agents/types"
+import { TERMINAL_TASK_STATUSES, type AgentTaskRecord, type MessageKind } from "@/lib/agents/types"
+import { runComputerSlice, type SliceOutcome } from "@/lib/computers/agent"
+import { ComputerStore } from "@/lib/computers/store"
 import { getInsForgeAdmin } from "@/lib/insforge/admin"
 
 /*
@@ -17,7 +20,11 @@ import { getInsForgeAdmin } from "@/lib/insforge/admin"
 
 // If a task it depends on isn't finished yet, check again this much later
 const DEPENDENCY_RECHECK_MS = 10 * 60 * 1000
-const TERMINAL: TaskStatus[] = ["completed", "failed", "blocked", "cancelled"]
+// If the agent's computer is busy with another task, check again this much later
+const COMPUTER_BUSY_RECHECK_MS = 2 * 60 * 1000
+// A task waiting for the user (login, captcha, take over) expires after this long
+export const USER_WAIT_MS = 24 * 60 * 60 * 1000
+const TERMINAL = TERMINAL_TASK_STATUSES
 
 export type RunContext = {
   taskId: string
@@ -42,14 +49,30 @@ export function storeFor(ctx: Pick<RunContext, "campaignId" | "userId">) {
   return new AgentStore(getInsForgeAdmin(), ctx.campaignId, ctx.userId)
 }
 
-async function campaignName(ctx: Pick<RunContext, "campaignId" | "userId">) {
+async function loadCampaign(ctx: Pick<RunContext, "campaignId" | "userId">) {
   const { data } = await getInsForgeAdmin()
     .database.from("campaign")
-    .select("name")
+    .select("name, status")
     .eq("id", ctx.campaignId)
     .eq("user_id", ctx.userId)
     .maybeSingle()
-  return data ? String(data.name) : null
+  return data ? { name: String(data.name), active: (data.status ?? "active") === "active" } : null
+}
+
+async function campaignName(ctx: Pick<RunContext, "campaignId" | "userId">) {
+  return (await loadCampaign(ctx))?.name ?? null
+}
+
+export function computersFor(ctx: Pick<RunContext, "campaignId" | "userId">) {
+  return new ComputerStore(ctx.campaignId, ctx.userId)
+}
+
+// Frees the agent's computer when its task stops using it. Cosmetic for other agents
+async function releaseComputer(ctx: Pick<RunContext, "campaignId" | "userId">, task: AgentTaskRecord) {
+  if (!isComputerAgent(task.agentKey)) return
+  await computersFor(ctx)
+    .release(task.agentKey, task.id)
+    .catch((error) => console.error(`Could not free the ${task.agentKey} computer`, error))
 }
 
 function post(store: AgentStore, message: NewMessage) {
@@ -79,8 +102,9 @@ export async function startTask(ctx: RunContext): Promise<StartResult> {
     return { action: "skip", reason: "A newer dispatch owns this task" }
   }
 
-  const name = await campaignName(ctx)
-  if (!name) return { action: "skip", reason: "Campaign no longer exists" }
+  const campaign = await loadCampaign(ctx)
+  if (!campaign) return { action: "skip", reason: "Campaign no longer exists" }
+  const name = campaign.name
 
   // Our own earlier attempt already claimed it: pick the same run back up
   if (task.status === "in_progress" || task.status === "in_review") {
@@ -89,6 +113,11 @@ export async function startTask(ctx: RunContext): Promise<StartResult> {
     return { action: "run", task, runId: run.id, campaignName: name, inputs: await inputsFor(store, task) }
   }
   if (task.status !== "queued") return { action: "skip", reason: `Task is ${task.status}` }
+
+  if (!campaign.active) {
+    await store.transitionTask(task.id, ctx.queuedAt, "queued", { status: "cancelled", error: "The campaign has ended." })
+    return { action: "skip", reason: "Campaign ended" }
+  }
 
   const request = await store.getRequest(task.requestId)
   if (request.status === "cancelled") {
@@ -119,6 +148,16 @@ export async function startTask(ctx: RunContext): Promise<StartResult> {
     return { action: "deferred", reason: `Waiting for "${waitingOn[0].title}"`, until }
   }
 
+  // Each agent runs one task at a time on its computer
+  if (isComputerAgent(task.agentKey)) {
+    const holder = await computersFor(ctx).acquire(task.agentKey, task.id)
+    if (holder !== task.id) {
+      const until = Date.now() + COMPUTER_BUSY_RECHECK_MS
+      await store.transitionTask(task.id, ctx.queuedAt, "queued", { status: "pending", queuedAt: null, scheduledAt: until })
+      return { action: "deferred", reason: "The agent's computer is busy with another task", until }
+    }
+  }
+
   const started = await store.transitionTask(task.id, ctx.queuedAt, "queued", {
     status: "in_progress",
     attempts: task.attempts + 1,
@@ -133,6 +172,7 @@ export async function startTask(ctx: RunContext): Promise<StartResult> {
     // Move past the occurrence that already ran instead of leaving the task stuck
     const next = started.repeatRule ? nextOccurrence(started.repeatRule, started.scheduledAt, started.runCount, Date.now()) : null
     await store.transitionTask(task.id, ctx.queuedAt, "in_progress", next ? { status: "pending", scheduledAt: next, queuedAt: null } : { status: "completed" })
+    await releaseComputer(ctx, started)
     return { action: "skip", reason: "This occurrence already ran" }
   }
 
@@ -235,6 +275,7 @@ export async function needsInput(ctx: RunContext, task: AgentTaskRecord, runId: 
   })
   await say(store, `The ${name} needs one detail from you before it can finish "${task.title}".\n\n${forUser}`, "clarification", task.requestId)
   await setAgent(store, task, "idle")
+  await releaseComputer(ctx, task)
 }
 
 /** Posts the work to the Master Agent and returns its review. A failed review approves the work. */
@@ -250,7 +291,10 @@ export async function reviewWork(
   await post(store, { thread: task.agentKey, sender: task.agentKey, recipient: MASTER_KEY, kind: "result", content: output, ...meta })
   await store.transitionTask(task.id, ctx.queuedAt, "in_progress", { status: "in_review" })
 
-  const review = await reviewOutput({ campaignName: campaign, task, output }).catch(() => ({ approved: true, feedback: "" }))
+  const evidence = isComputerAgent(task.agentKey) ? await computerEvidence(ctx, task) : null
+  // Reviewed against the latest instructions, which include details the user added mid-task
+  const latest = (await store.getTask(task.id).catch(() => null)) ?? task
+  const review = await reviewOutput({ campaignName: campaign, task: latest, output, evidence }).catch(() => ({ approved: true, feedback: "" }))
   const feedback = review.feedback.trim()
   if (!review.approved && feedback && canRevise) {
     await post(store, { thread: task.agentKey, sender: MASTER_KEY, recipient: task.agentKey, kind: "review", content: `Please revise: ${feedback}`, ...meta })
@@ -287,16 +331,61 @@ export async function completeTask(
   const common = { output, reviewFeedback: feedback, runCount, lastRunAt: now, completedAt: now, error: null }
 
   await store.finishRun(runId, "completed", { output })
+  // The searchable record of this result. Best effort: it never blocks completing the task
+  await saveTaskResult(ctx, store, task, runId, output, feedback).catch((error) => console.error("Could not save the task result", error))
   const saved = await store.transitionTask(task.id, ctx.queuedAt, ["in_progress", "in_review"], next
     ? { ...common, status: "pending", scheduledAt: next, nextRunAt: nextOccurrence(task.repeatRule!, next, runCount, next), queuedAt: null }
     : { ...common, status: "completed", nextRunAt: null })
   await setAgent(store, task, "idle")
+  await releaseComputer(ctx, task)
   if (!saved) return { next: null }
 
   // The next occurrence may already be due (e.g. hourly tasks that ran late)
   if (next) await dispatchDueTasks(store, [saved])
   await finishRequestIfSettled(store, task.requestId, campaign)
   return { next }
+}
+
+// First paragraph of the output, which agents write as their summary
+function summaryOf(output: string) {
+  const first = output.trim().split(/\n\s*\n/)[0]?.trim() ?? ""
+  return (first.length > 20 ? first : output.trim()).slice(0, 600)
+}
+
+/**
+ * Saves one record per finished occurrence with everything it produced: the output, the images,
+ * files and sources, and the findings and drafts saved during this run. Found later by search.
+ */
+async function saveTaskResult(ctx: RunContext, store: AgentStore, task: AgentTaskRecord, runId: string, output: string, feedback: string | null) {
+  const outputs = OutputStore.admin(ctx.campaignId, ctx.userId)
+  // Repeating tasks reuse the same id: only what this run made counts
+  const since = task.startedAt ?? 0
+  const recent = <T extends { createdAt: number }>(items: T[]) => items.filter((i) => i.createdAt >= since - 1000)
+  const [artifacts, findings, drafts, request] = await Promise.all([
+    isComputerAgent(task.agentKey) ? computersFor(ctx).listTaskArtifacts(task.id).then(recent) : Promise.resolve([]),
+    task.agentKey === "research" ? outputs.listTaskFindings(task.id).then(recent) : Promise.resolve([]),
+    task.agentKey === "creator" ? outputs.listTaskDrafts(task.id).then(recent) : Promise.resolve([]),
+    store.getRequest(task.requestId).catch(() => null),
+  ])
+  const urls = (kind: string) => [...new Set(artifacts.filter((a) => a.kind === kind).map((a) => a.url))]
+  const sources = new Set([...urls("link"), ...findings.flatMap((f) => f.sources.map((s) => s.url))])
+  await outputs.saveTaskResult({
+    requestId: task.requestId,
+    taskId: task.id,
+    runId,
+    agentKey: task.agentKey,
+    taskTitle: task.title,
+    requestPrompt: request?.prompt ?? null,
+    summary: summaryOf(output),
+    output,
+    reviewFeedback: feedback,
+    imageUrls: [...new Set([...urls("image"), ...drafts.flatMap((d) => d.imageUrls)])],
+    fileUrls: urls("file"),
+    sourceUrls: [...sources],
+    findingIds: findings.map((f) => f.id),
+    draftIds: drafts.map((d) => d.id),
+    usedBrowser: artifacts.some((a) => a.kind === "page"),
+  })
 }
 
 /** After all retries failed. Repeating tasks still move on to their next occurrence. */
@@ -311,7 +400,8 @@ export async function failTask(ctx: RunContext, message: string) {
   const now = Date.now()
   const runCount = task.runCount + 1
   const next = task.repeatRule && run ? nextOccurrence(task.repeatRule, task.scheduledAt, runCount, now) : null
-  const saved = await store.transitionTask(task.id, ctx.queuedAt, ["queued", "in_progress", "in_review"], next
+  await releaseComputer(ctx, task)
+  const saved = await store.transitionTask(task.id, ctx.queuedAt, ["queued", "in_progress", "in_review", "waiting_for_user"], next
     ? {
         status: "pending",
         scheduledAt: next,
@@ -363,7 +453,7 @@ export async function finishRequestIfSettled(store: AgentStore, requestId: strin
     console.error("Master Agent summary failed", error)
     return delivered.map((t) => `${ROLES[t.agentKey].name} - ${t.title}:\n${t.output}`).join("\n\n")
   })
-  const unfinished = tasks.filter((t) => t.status === "failed" || t.status === "blocked").length
+  const unfinished = tasks.filter((t) => t.status === "failed" || t.status === "blocked" || t.status === "expired").length
   await store.updateRequest(requestId, {
     summary: summary || "Done.",
     error: unfinished > 0 ? `${unfinished} task(s) did not finish.` : null,
@@ -371,4 +461,143 @@ export async function finishRequestIfSettled(store: AgentStore, requestId: strin
   const repeating = tasks.filter((t) => t.repeatRule && t.status === "pending").length
   const note = repeating ? `\n\n${repeating === 1 ? "1 task repeats" : `${repeating} tasks repeat`} on schedule; I'll keep the team on it.` : ""
   await say(store, `${summary || "All done."}${note}`, "summary", requestId)
+}
+
+// ---- Computer agents (Research, Creator): their own desktop ----
+
+/** What the agent's computer log shows, so the Master Agent can check the work was really done. */
+async function computerEvidence(ctx: RunContext, task: AgentTaskRecord) {
+  const outputs = OutputStore.admin(ctx.campaignId, ctx.userId)
+  const since = (task.startedAt ?? 0) - 1000
+  const [artifacts, findings, drafts] = await Promise.all([
+    computersFor(ctx).listTaskArtifacts(task.id).catch(() => []),
+    task.agentKey === "research" ? outputs.listTaskFindings(task.id).catch(() => []) : Promise.resolve([]),
+    task.agentKey === "creator" ? outputs.listTaskDrafts(task.id).catch(() => []) : Promise.resolve([]),
+  ])
+  const pages = artifacts.filter((a) => a.kind === "page")
+  const files = artifacts.filter((a) => a.kind === "image" || a.kind === "file")
+  const lines = [
+    pages.length
+      ? `Pages the agent actually opened on its computer:\n${pages.map((p) => `- ${p.url}`).join("\n")}`
+      : "The agent's computer log shows it did not open any web pages.",
+    files.length ? `Files it made and uploaded:\n${files.map((f) => `- ${f.name}: ${f.url}`).join("\n")}` : "It uploaded no files.",
+  ]
+  const newFindings = findings.filter((f) => f.createdAt >= since)
+  if (task.agentKey === "research") {
+    lines.push(
+      newFindings.length
+        ? `Research findings it saved to the database:\n${newFindings.map((f) => `- [${f.kind}, ${f.basis}] ${f.title}`).join("\n")}`
+        : "It saved no research findings to the database."
+    )
+  }
+  const newDrafts = drafts.filter((d) => d.createdAt >= since)
+  if (task.agentKey === "creator") {
+    lines.push(
+      newDrafts.length
+        ? `Content drafts it saved to the database:\n${newDrafts.map((d) => `- ${d.format} for ${d.platform}: ${d.title}${d.imageUrls.length ? ` (${d.imageUrls.length} image${d.imageUrls.length === 1 ? "" : "s"})` : ""}`).join("\n")}`
+        : "It saved no content drafts to the database."
+    )
+  }
+  return lines.join("\n\n")
+}
+
+export type ComputerStep = SliceOutcome | { kind: "stopped"; reason: string }
+
+/**
+ * Runs the agent on its computer for one background step (a few minutes). Stops instead if the
+ * task was cancelled or the campaign ended in the meantime.
+ */
+export async function computerSlice(
+  ctx: RunContext,
+  task: AgentTaskRecord,
+  campaign: string,
+  inputs: TaskInput[],
+  clarifications: string | null,
+  feedback: string | null,
+  attempt: number
+): Promise<ComputerStep> {
+  const store = storeFor(ctx)
+  const [current, info] = await Promise.all([store.getTask(task.id), loadCampaign(ctx)])
+  if (!info?.active) return { kind: "stopped", reason: "The campaign has ended." }
+  if (!current || current.queuedAt !== ctx.queuedAt || !["in_progress", "in_review"].includes(current.status)) {
+    return { kind: "stopped", reason: `The task is ${current?.status.replace("_", " ") ?? "gone"}.` }
+  }
+  // The fresh copy carries details the user added after the task started
+  return runComputerSlice({ computers: computersFor(ctx), agents: store, task: current, campaignName: campaign, attempt, inputs, clarifications, feedback })
+}
+
+/**
+ * The agent is waiting for the user: a login or captcha it asked for help with, or the user took
+ * over its computer. The task becomes "Waiting for you" until they click Done / Hand back.
+ */
+export async function startWaitingForUser(ctx: RunContext, task: AgentTaskRecord, outcome: { kind: "needs_user"; reason: string; url: string | null } | { kind: "takeover" }) {
+  const store = storeFor(ctx)
+  const until = Date.now() + USER_WAIT_MS
+  const reason = outcome.kind === "needs_user" ? outcome.reason : "You took over the computer. The agent continues when you hand it back."
+  const waiting = await store.transitionTask(task.id, ctx.queuedAt, ["in_progress", "in_review"], {
+    status: "waiting_for_user",
+    waitingReason: reason,
+    waitingUrl: outcome.kind === "needs_user" ? outcome.url : null,
+    waitingUntil: until,
+  })
+  if (!waiting) return { waiting: false as const }
+
+  const activity = outcome.kind === "needs_user" ? "Waiting for you to log in" : "Waiting for you to hand back control"
+  await computersFor(ctx).update(task.agentKey as ComputerAgentKey, { activity }).catch(() => undefined)
+  await store.setActivity(task.agentKey, activity).catch(() => undefined)
+
+  if (outcome.kind === "needs_user") {
+    const name = ROLES[task.agentKey].name
+    const where = outcome.url ? ` (${new URL(outcome.url).hostname.replace(/^www\./, "")})` : ""
+    await post(store, { thread: task.agentKey, sender: task.agentKey, recipient: MASTER_KEY, kind: "question", content: `I need the user's help: ${outcome.reason}`, requestId: task.requestId, taskId: task.id })
+    await say(
+      store,
+      `The ${name} needs your help on its computer${where} to continue "${task.title}":\n${outcome.reason}\n\nOpen its computer with "Login now", do it yourself (the agent never sees your password), then click "Done". If nobody responds within 24 hours, the task expires.`,
+      "clarification",
+      task.requestId
+    )
+  }
+  return { waiting: true as const }
+}
+
+export type UserWaitStatus = "resolved" | "waiting" | "expired" | "stopped"
+
+/** Whether the user clicked Done / Hand back (the routes move the task back to in_progress). */
+export async function checkUserWait(ctx: RunContext, taskId: string): Promise<UserWaitStatus> {
+  const [task, info] = await Promise.all([storeFor(ctx).getTask(taskId), loadCampaign(ctx)])
+  if (!task || task.queuedAt !== ctx.queuedAt || !info?.active) return "stopped"
+  if (task.status === "in_progress" || task.status === "in_review") return "resolved"
+  if (task.status !== "waiting_for_user") return "stopped"
+  return task.waitingUntil && task.waitingUntil <= Date.now() ? "expired" : "waiting"
+}
+
+/** Nobody responded within 24 hours. */
+export async function expireTask(ctx: RunContext, task: AgentTaskRecord) {
+  const store = storeFor(ctx)
+  const expired = await store.transitionTask(task.id, ctx.queuedAt, "waiting_for_user", {
+    status: "expired",
+    error: "Nobody responded within 24 hours.",
+    waitingUntil: null,
+  })
+  if (!expired) return
+  const run = await store.getRun(task.id, task.scheduledAt)
+  if (run?.status === "running") await store.finishRun(run.id, "failed", { error: "Expired while waiting for the user." })
+  await computersFor(ctx).deleteRunState(task.id).catch(() => undefined)
+  await computersFor(ctx).update(task.agentKey as ComputerAgentKey, { control: "agent" }).catch(() => undefined)
+  await releaseComputer(ctx, task)
+  await setAgent(store, task, "idle")
+  await say(store, `"${task.title}" expired: the ${ROLES[task.agentKey].name} waited 24 hours for your help. Ask me again whenever you're ready.`, "update", task.requestId)
+  const name = await campaignName(ctx)
+  if (name) await finishRequestIfSettled(store, task.requestId, name)
+}
+
+/** The task was cancelled or the campaign ended while the agent worked: tidy up without failing it. */
+export async function stopComputerTask(ctx: RunContext, task: AgentTaskRecord, reason: string) {
+  const store = storeFor(ctx)
+  await store.transitionTask(task.id, ctx.queuedAt, ["in_progress", "in_review", "waiting_for_user"], { status: "cancelled", error: reason })
+  const run = await store.getRun(task.id, task.scheduledAt)
+  if (run?.status === "running") await store.finishRun(run.id, "failed", { error: reason })
+  await computersFor(ctx).deleteRunState(task.id).catch(() => undefined)
+  await releaseComputer(ctx, task)
+  await setAgent(store, task, "idle")
 }

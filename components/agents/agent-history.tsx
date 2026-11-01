@@ -1,10 +1,11 @@
 "use client"
 
 import { format, formatDistanceToNow } from "date-fns"
-import { CalendarClock, ChevronDown, ClipboardList, Repeat } from "lucide-react"
+import { CalendarClock, ChevronDown, ClipboardList, KeyRound, Repeat } from "lucide-react"
 import { cn } from "cn"
 import { describeRepeat, formatWhen } from "@/lib/agents/schedule"
-import type { AgentTaskRecord, TaskRunRecord, TaskStatus } from "@/lib/agents/types"
+import type { AgentTaskRecord, ArtifactRecord, TaskRunRecord, TaskStatus } from "@/lib/agents/types"
+import { TaskArtifacts } from "@/components/agents/task-artifacts"
 
 const RUN_STATUS: Record<TaskRunRecord["status"], string> = {
   running: "Running",
@@ -19,10 +20,12 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; className: string;
   in_progress: { label: "Working…", className: "bg-blue-500/12 text-blue-700 dark:text-blue-300", dot: "bg-blue-500 animate-pulse" },
   in_review: { label: "In review", className: "bg-violet-500/12 text-violet-700 dark:text-violet-300", dot: "bg-violet-500 animate-pulse" },
   needs_input: { label: "Needs your input", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  waiting_for_user: { label: "Waiting for you", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500 animate-pulse" },
   completed: { label: "Done", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
   failed: { label: "Failed", className: "bg-destructive/10 text-destructive", dot: "bg-destructive" },
   blocked: { label: "Skipped", className: "bg-destructive/10 text-destructive", dot: "bg-destructive/60" },
   cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/40" },
+  expired: { label: "Expired", className: "bg-destructive/10 text-destructive", dot: "bg-destructive/60" },
 }
 
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
@@ -37,13 +40,20 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
 export function TaskItem({
   task,
   runs = [],
+  artifacts = [],
   prefix,
+  onHelp,
 }: {
   task: AgentTaskRecord
   // Past runs, for repeating tasks
   runs?: TaskRunRecord[]
+  // Files and links the agent made for this task
+  artifacts?: ArtifactRecord[]
   prefix?: React.ReactNode
+  // Opens the agent's computer when the task is waiting for the user
+  onHelp?: () => void
 }) {
+  const made = artifacts.filter((a) => a.kind === "image" || a.kind === "file").length
   const upcoming = task.status === "pending" || task.status === "queued"
   return (
     <li className="rounded-xl border bg-background">
@@ -68,7 +78,26 @@ export function TaskItem({
                 </span>
               )}
               {task.attempts > 1 && <span>{task.attempts} attempts</span>}
+              {made > 0 && <span>{made === 1 ? "1 file" : `${made} files`}</span>}
             </p>
+            {task.status === "waiting_for_user" && task.waitingReason && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                <KeyRound className="size-3 shrink-0" />
+                <span className="line-clamp-2">{task.waitingReason}</span>
+                {onHelp && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      onHelp()
+                    }}
+                    className="shrink-0 rounded-md bg-amber-500/20 px-1.5 py-0.5 font-semibold hover:bg-amber-500/30"
+                  >
+                    Login now
+                  </button>
+                )}
+              </p>
+            )}
           </div>
           <TaskStatusBadge status={task.status} />
           <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -84,6 +113,7 @@ export function TaskItem({
               <p className="mt-1 whitespace-pre-line">{task.output}</p>
             </div>
           )}
+          <TaskArtifacts artifacts={artifacts} />
           {task.reviewFeedback && (
             <div>
               <p className="font-semibold text-muted-foreground">Master Agent review</p>
@@ -111,7 +141,19 @@ export function TaskItem({
 }
 
 /** Tasks the Master Agent assigned to one regular agent, newest first. */
-export function AgentHistory({ tasks, runs = [], agentName }: { tasks: AgentTaskRecord[]; runs?: TaskRunRecord[]; agentName: string }) {
+export function AgentHistory({
+  tasks,
+  runs = [],
+  artifacts = [],
+  agentName,
+  onHelp,
+}: {
+  tasks: AgentTaskRecord[]
+  runs?: TaskRunRecord[]
+  artifacts?: ArtifactRecord[]
+  agentName: string
+  onHelp?: () => void
+}) {
   if (tasks.length === 0) {
     return (
       <div className="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-300">
@@ -131,7 +173,13 @@ export function AgentHistory({ tasks, runs = [], agentName }: { tasks: AgentTask
       {[...tasks]
         .sort((a, b) => b.createdAt - a.createdAt)
         .map((task) => (
-          <TaskItem key={task.id} task={task} runs={runs.filter((r) => r.taskId === task.id)} />
+          <TaskItem
+            key={task.id}
+            task={task}
+            runs={runs.filter((r) => r.taskId === task.id)}
+            artifacts={artifacts.filter((a) => a.taskId === task.id)}
+            onHelp={onHelp}
+          />
         ))}
     </ol>
   )

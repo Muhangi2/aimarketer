@@ -6,6 +6,7 @@ import { useAgentWorkspace } from "@/hooks/use-agent-workspace"
 import { AgentPanel } from "@/components/agents/agent-panel"
 import { MasterAgentCard } from "@/components/agents/master-agent-card"
 import { AgentOfficePanel } from "@/components/office/agent-office-panel"
+import { ComputerViewer } from "@/components/computers/computer-viewer"
 
 // Height of the pinned columns: the window minus the 4rem header and page padding
 const PINNED = "lg:sticky lg:top-8 lg:h-[calc(100svh-8rem)] lg:self-start"
@@ -67,9 +68,11 @@ export function OverviewWorkspace({
             if (seat) workspace.select(seat.role.key)
           }}
           pausedSeatIds={workspace.pausedSeatIds}
+          seatStatus={(seat) => workspace.statusFor(seat.role.key)}
           className="lg:h-full"
         />
       </div>
+      <ComputerViewer workspace={workspace} />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { AGENT_KEYS, MASTER_KEY, MASTER_ROLE } from "@/lib/agent-roles"
 import type { AgentWorkspaceState } from "@/hooks/use-agent-workspace"
 import { AgentAvatar } from "@/components/agents/agent-avatar"
 import { AgentStatusBadge, MasterAvatar } from "@/components/agents/participant-avatar"
+import { LiveActivity, LiveStatusBadge } from "@/components/agents/live-status-badge"
 
 /**
  * The Master Agent's highlighted card: what it is coordinating right now and the team it leads.
@@ -87,9 +88,7 @@ export function MasterAgentCard({
                 const seat = workspace.seatFor(key)
                 if (!seat) return null
                 const agentStatus = workspace.states[key]
-                const current = workspace.tasks.find(
-                  (t) => t.agentKey === key && (t.status === "in_progress" || t.status === "in_review")
-                )
+                const live = workspace.statusFor(key)
                 return (
                   <button
                     key={key}
@@ -104,8 +103,8 @@ export function MasterAgentCard({
                         <span className="text-sm leading-none">{seat.role.emoji}</span>
                       </span>
                       <span className="mt-1 flex min-w-0 items-center gap-1.5">
-                        <AgentStatusBadge status={agentStatus} className="shrink-0" />
-                        <span className="truncate text-[11px] text-muted-foreground">{current?.title ?? seat.role.task}</span>
+                        <LiveStatusBadge status={live} />
+                        <LiveActivity status={live} fallback={seat.role.task} />
                       </span>
                     </span>
                   </button>

@@ -1,19 +1,30 @@
 import { NonRetriableError } from "inngest"
 import { inngest, taskExecuteEvent } from "@/lib/inngest/client"
 import { getInsForgeAdmin } from "@/lib/insforge/admin"
+import { COMPUTER_AGENT_KEYS, isComputerAgent } from "@/lib/agent-roles"
 import { DISPATCH_WINDOW_MS, iso } from "@/lib/agents/schedule"
 import {
   answerQuestion,
+  checkUserWait,
   completeTask,
+  computerSlice,
+  expireTask,
   failTask,
   needsInput,
   reviewWork,
   runAgent,
   startTask,
+  startWaitingForUser,
+  stopComputerTask,
   type AgentAttempt,
+  type ComputerStep,
   type ReviewResult,
   type RunContext,
+  type UserWaitStatus,
 } from "@/lib/agents/task-runner"
+import { markCampaignEnded, shutDownComputer, stopCampaignPlans } from "@/lib/computers/campaign"
+import { pauseDesktop } from "@/lib/computers/desktop"
+import { ComputerStore, listIdleComputers } from "@/lib/computers/store"
 
 // Claim slightly more than the 15 minute interval so cron jitter never leaves a gap.
 // Overlap is harmless: a task can only be claimed once.
@@ -25,6 +36,16 @@ const MAX_AGENT_ATTEMPTS = 4
 // Said to the agent on its last attempt, so the run ends with work rather than another question
 const DELIVER_NOW = "This is your last attempt: do not ask any more questions. Deliver the finished work now, stating any assumptions."
 const MAX_REVISIONS = 1
+// Background steps (a few minutes each) a computer agent gets per attempt
+const MAX_COMPUTER_SLICES = 20
+// While waiting for the user, the task is re-checked this often in case an event was missed
+const USER_WAIT_CHUNK = "30m"
+// Enough chunks to cover the 24 hour expiry
+const MAX_USER_WAIT_CHECKS = 50
+// Desktops nobody used for this long are paused
+const IDLE_PAUSE_MS = 3 * 60 * 1000
+
+type Stopped = { kind: "stopped"; reason: string }
 
 type ClaimedRow = {
   id: string
@@ -114,10 +135,57 @@ export const executeTask = inngest.createFunction(
     // Work already delivered, kept in case a revision attempt doesn't deliver
     let delivered: string | null = null
 
+    // Waits (in 30 minute chunks) until the user clicks Done / Hand back, or the 24 hours run out
+    const waitForUser = async (label: string): Promise<UserWaitStatus> => {
+      for (let i = 0; i < MAX_USER_WAIT_CHECKS; i++) {
+        const status: UserWaitStatus = await step.run(`user-check-${label}-${i}`, () => checkUserWait(ctx, task.id))
+        if (status !== "waiting") return status
+        await step.waitForEvent(`user-wait-${label}-${i}`, {
+          event: "computer/resume",
+          timeout: USER_WAIT_CHUNK,
+          if: `async.data.taskId == "${task.id}"`,
+        })
+      }
+      return "expired"
+    }
+
+    // A computer agent works in slices of a few minutes; its run is saved in between
+    const computerAttempt = async (attempt: number, instruction: string | null): Promise<AgentAttempt | Stopped> => {
+      for (let slice = 0; slice < MAX_COMPUTER_SLICES; slice++) {
+        const label = `${attempt}-${slice}`
+        const outcome: ComputerStep = await step.run(`computer-${label}`, () =>
+          computerSlice(ctx, task, campaignName, inputs, clarifications, instruction, attempt)
+        )
+        if (outcome.kind === "done") return outcome.attempt
+        if (outcome.kind === "continue") continue
+        if (outcome.kind === "stopped") {
+          await step.run(`stop-${label}`, () => stopComputerTask(ctx, task, outcome.reason))
+          return outcome
+        }
+
+        // Login, captcha or take over: park the task until the user is done
+        const parked = await step.run(`wait-start-${label}`, () => startWaitingForUser(ctx, task, outcome))
+        const waited: UserWaitStatus = parked.waiting ? await waitForUser(label) : "stopped"
+        if (waited === "expired") {
+          await step.run(`expire-${label}`, () => expireTask(ctx, task))
+          return { kind: "stopped", reason: "Expired waiting for the user" }
+        }
+        if (waited === "stopped") {
+          await step.run(`stop-${label}`, () => stopComputerTask(ctx, task, "The task was stopped while waiting for you."))
+          return { kind: "stopped", reason: "Stopped while waiting for the user" }
+        }
+        // Resolved: the next slice picks the saved run back up
+      }
+      throw new NonRetriableError("The agent ran out of time on its computer.")
+    }
+
     for (let attempt = 0; attempt < MAX_AGENT_ATTEMPTS; attempt++) {
       const lastAttempt = attempt === MAX_AGENT_ATTEMPTS - 1
       const instruction: string | null = lastAttempt ? [feedback, DELIVER_NOW].filter(Boolean).join("\n") : feedback
-      const result: AgentAttempt = await step.run(`agent-attempt-${attempt}`, (): Promise<AgentAttempt> => runAgent(task, campaignName, inputs, clarifications, instruction))
+      const result: AgentAttempt | Stopped = isComputerAgent(task.agentKey)
+        ? await computerAttempt(attempt, instruction)
+        : await step.run(`agent-attempt-${attempt}`, (): Promise<AgentAttempt> => runAgent(task, campaignName, inputs, clarifications, instruction))
+      if (result.kind === "stopped") return { action: "stopped", reason: result.reason }
 
       if (result.kind === "question") {
         if (lastAttempt) break
@@ -166,4 +234,38 @@ function contextFrom(data: { taskId: string; userId: string; campaignId: string;
   }
 }
 
-export const functions = [dispatchDueTasks, executeTask]
+/**
+ * Every minute: pauses desktops nobody has used for 3 minutes. A screenshot is saved first so
+ * the UI can still show the screen while it's paused.
+ */
+export const pauseIdleComputers = inngest.createFunction(
+  { id: "pause-idle-computers", name: "Pause idle agent computers", concurrency: { limit: 1 } },
+  { cron: "* * * * *" },
+  async ({ step }) => {
+    const idle = await step.run("find-idle-computers", () => listIdleComputers(Date.now() - IDLE_PAUSE_MS))
+    for (const computer of idle) {
+      await step.run(`pause-${computer.campaignId}-${computer.agentKey}`, async () => {
+        await pauseDesktop(new ComputerStore(computer.campaignId, computer.userId), computer)
+      })
+    }
+    return { paused: idle.length }
+  }
+)
+
+/** "End campaign": stops its plans, saves files left on the computers, then shuts them down. */
+export const endCampaign = inngest.createFunction(
+  { id: "end-campaign", name: "End campaign", retries: 3, idempotency: "event.data.campaignId" },
+  { event: "campaign/end" },
+  async ({ event, step }) => {
+    const { campaignId, userId } = event.data
+    await step.run("stop-plans", () => stopCampaignPlans(campaignId, userId))
+    let saved = 0
+    for (const agentKey of COMPUTER_AGENT_KEYS) {
+      saved += await step.run(`shut-down-${agentKey}`, () => shutDownComputer(campaignId, userId, agentKey))
+    }
+    await step.run("mark-ended", () => markCampaignEnded(campaignId, userId, saved))
+    return { saved }
+  }
+)
+
+export const functions = [dispatchDueTasks, executeTask, pauseIdleComputers, endCampaign]

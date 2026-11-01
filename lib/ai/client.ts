@@ -24,3 +24,13 @@ export function chatModel() {
   // Ollama speaks the Chat Completions API
   return new OpenAIChatCompletionsModel(aiClient, AI_MODEL)
 }
+
+/**
+ * Computer agents read screenshots, so they need a vision model. COMPUTER_MODEL picks one on the
+ * same endpoint (e.g. gpt-4.1-mini on OpenAI, qwen2.5vl on Ollama); defaults to AI_MODEL.
+ */
+export const COMPUTER_MODEL = process.env.COMPUTER_MODEL || AI_MODEL
+
+export function computerModel() {
+  return new OpenAIChatCompletionsModel(aiClient, COMPUTER_MODEL)
+}

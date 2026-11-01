@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react"
 import { format } from "date-fns"
-import { ArrowRight, Paperclip, SendHorizonal } from "lucide-react"
+import { ArrowRight, KeyRound, Paperclip, SendHorizonal } from "lucide-react"
 import { cn } from "cn"
-import { participantName, type AgentKey, type ThreadKey } from "@/lib/agent-roles"
+import { isComputerAgent, participantName, type AgentKey, type ComputerAgentKey, type ThreadKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
-import type { AgentMessage, MessageKind } from "@/lib/agents/types"
+import type { AgentMessage, AgentTaskRecord, ArtifactRecord, MessageKind } from "@/lib/agents/types"
 import { ParticipantAvatar } from "@/components/agents/participant-avatar"
+import { ImageStrip, imageUrlsIn } from "@/components/agents/task-artifacts"
 import { Button } from "@/components/ui/button"
 
 // Models sometimes ignore the plain-text rule; drop the markdown symbols the chat can't render
@@ -39,6 +40,26 @@ const KIND_TONE: Partial<Record<MessageKind, string>> = {
   summary: "border border-emerald-500/25 bg-emerald-500/8",
 }
 
+/**
+ * Images to show under a message: for delivered work, the task's images; for the Master Agent's
+ * results, the images of every task in the request; plus any image links written in the text.
+ */
+function imagesFor(m: AgentMessage, tasks: AgentTaskRecord[], artifacts: ArtifactRecord[]) {
+  let taskIds: Set<string> | null = null
+  if (m.kind === "result" && m.taskId) taskIds = new Set([m.taskId])
+  else if (m.kind === "summary" && m.requestId) taskIds = new Set(tasks.filter((t) => t.requestId === m.requestId).map((t) => t.id))
+  const fromTasks = taskIds ? artifacts.filter((a) => a.kind === "image" && a.taskId && taskIds.has(a.taskId)).map((a) => a.url) : []
+  return [...new Set([...fromTasks, ...imageUrlsIn(m.content)])]
+}
+
+// Only the newest help request of a request gets the button
+function lastHelpMessage(messages: AgentMessage[], requestId: string) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].kind === "clarification" && messages[i].requestId === requestId) return messages[i].id
+  }
+  return null
+}
+
 export function AgentChat({
   owner,
   greeting,
@@ -46,9 +67,13 @@ export function AgentChat({
   typing,
   busy,
   paused,
+  disabled = false,
   placeholder,
   userInitial,
   seatFor,
+  tasks = [],
+  artifacts = [],
+  onHelp,
   onSend,
 }: {
   // Whose chat this is
@@ -60,9 +85,16 @@ export function AgentChat({
   // A request from the user is still in progress
   busy: boolean
   paused: boolean
+  // No new messages (e.g. the campaign ended)
+  disabled?: boolean
   placeholder: string
   userInitial: string
   seatFor: (key: AgentKey) => OfficeSeat | null
+  // For "Login now" on messages about a task that waits for the user
+  tasks?: AgentTaskRecord[]
+  // Images agents made, shown under their results
+  artifacts?: ArtifactRecord[]
+  onHelp?: (key: ComputerAgentKey) => void
   onSend: (text: string) => void
 }) {
   const [draft, setDraft] = useState("")
@@ -77,7 +109,7 @@ export function AgentChat({
 
   function submit() {
     const text = draft.trim()
-    if (!text || busy) return
+    if (!text || busy || disabled) return
     onSend(text)
     setDraft("")
   }
@@ -122,7 +154,12 @@ export function AgentChat({
 
           // Agent-to-agent traffic (Master <-> this agent) gets a "from -> to" label
           const label = KIND_LABEL[m.kind]
+          // The Master Agent asked the user to log in on an agent's computer, and it's still waiting
+          const waiting = m.kind === "clarification" && m.requestId
+            ? tasks.find((t) => t.status === "waiting_for_user" && t.requestId === m.requestId && isComputerAgent(t.agentKey))
+            : undefined
           const between = m.recipient !== "user"
+          const images = m.kind === "result" || m.kind === "summary" ? imagesFor(m, tasks, artifacts) : []
           return (
             <div key={m.id} className="flex max-w-[85%] gap-3 animate-in fade-in slide-in-from-bottom-1 duration-300">
               {avatar(m.sender)}
@@ -148,6 +185,12 @@ export function AgentChat({
                   )}
                 >
                   {plainText(m.content)}
+                  <ImageStrip urls={images} className="mt-3 whitespace-normal" />
+                  {waiting && onHelp && m.id === lastHelpMessage(messages, waiting.requestId) && (
+                    <Button size="sm" className="mt-3 flex h-8 rounded-lg" onClick={() => onHelp(waiting.agentKey as ComputerAgentKey)}>
+                      <KeyRound /> Login now
+                    </Button>
+                  )}
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground" suppressHydrationWarning>
                   {format(m.at, "h:mm a")}
@@ -185,6 +228,7 @@ export function AgentChat({
         <textarea
           value={draft}
           rows={1}
+          disabled={disabled}
           aria-label="Message"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -202,7 +246,7 @@ export function AgentChat({
           type="submit"
           size="icon"
           className={cn("size-9 shrink-0 rounded-xl shadow-sm shadow-primary/30 transition-transform", draft.trim() && !busy && "scale-105")}
-          disabled={!draft.trim() || busy}
+          disabled={!draft.trim() || busy || disabled}
           aria-label="Send"
         >
           <SendHorizonal />

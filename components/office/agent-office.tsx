@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
 import type { OfficeScene, OfficeSeat } from "@/lib/office-scene"
+import { LIVE_STATUS_STYLE, type LiveStatus } from "@/lib/agents/live-status"
 
 // Matches the frame rate used by the AgentWorld Studio editor
 const FRAME_MS = 260
@@ -74,6 +75,7 @@ export function AgentOffice({
   selectedSeatId,
   onSelectSeat,
   pausedSeatIds,
+  seatStatus,
 }: {
   scene: OfficeScene
   className?: string
@@ -81,6 +83,7 @@ export function AgentOffice({
   selectedSeatId?: string | null
   onSelectSeat?: (seatId: string) => void
   pausedSeatIds?: ReadonlySet<string>
+  seatStatus?: (seat: OfficeSeat) => LiveStatus
 }) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const loaded = loadedSrc === scene.background
@@ -167,6 +170,7 @@ export function AgentOffice({
               pointerShift={point.left - left}
               selected={seat.id === selectedSeatId}
               paused={pausedSeatIds?.has(seat.id) ?? false}
+              live={seatStatus?.(seat)}
               onSelect={onSelectSeat ? () => onSelectSeat(seat.id) : undefined}
             />
           )
@@ -183,6 +187,7 @@ function AgentTag({
   pointerShift,
   selected,
   paused,
+  live,
   onSelect,
 }: {
   seat: OfficeSeat
@@ -193,9 +198,15 @@ function AgentTag({
   pointerShift: number
   selected: boolean
   paused: boolean
+  live?: LiveStatus
   onSelect?: () => void
 }) {
   const { role } = seat
+  // What the agent is doing right now; the role's usual task when there's no live status
+  const caption = live ? (live.activity ? `${live.label} · ${live.activity}` : live.label) : paused ? "Paused" : `${role.task}…`
+  const dot = live ? LIVE_STATUS_STYLE[live.key].dot : paused ? "bg-amber-400" : "bg-emerald-400"
+  // Agents that are working or need the user show their activity without hovering
+  const showCaption = selected || live?.key === "running" || live?.key === "waiting" || live?.key === "in_control"
 
   return (
     <div
@@ -210,7 +221,7 @@ function AgentTag({
           type="button"
           onClick={onSelect}
           aria-pressed={onSelect ? selected : undefined}
-          aria-label={`${role.name}: ${role.task}`}
+          aria-label={`${role.name}: ${caption}`}
           className={cn(
             "group/tag relative flex items-center gap-1.5 rounded-full border py-1 pr-2.5 pl-1 text-left shadow-lg backdrop-blur-md transition-all duration-300 outline-none hover:scale-105 hover:pr-3 focus-visible:ring-3 focus-visible:ring-primary/40",
             selected
@@ -235,22 +246,22 @@ function AgentTag({
               )}
             >
               {role.name}
-              <span className={cn("size-1.5 rounded-full", paused ? "bg-amber-400" : "bg-emerald-400")} aria-hidden />
+              <span className={cn("size-1.5 rounded-full", dot)} aria-hidden />
             </span>
             {/* Current task: always shown for the selected agent, otherwise slides open on hover / focus */}
             <span
               className={cn(
                 "grid transition-[grid-template-rows] duration-300 group-hover/tag:grid-rows-[1fr] group-focus-visible/tag:grid-rows-[1fr]",
-                selected ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                showCaption ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
               )}
             >
               <span
                 className={cn(
-                  "overflow-hidden text-[10px] whitespace-nowrap",
+                  "max-w-48 overflow-hidden text-[10px] text-ellipsis whitespace-nowrap",
                   selected ? "text-blue-100" : "text-slate-500 dark:text-slate-300"
                 )}
               >
-                {paused ? "Paused" : `${role.task}…`}
+                {caption}
               </span>
             </span>
           </span>
