@@ -66,7 +66,8 @@ export type SliceOutcome =
 
 type PauseReason = "timeslice" | "takeover" | "needs_user"
 
-type SavedRun = { reason: PauseReason; help: { reason: string; url: string | null } | null; runState: string }
+// browse: whether the run had the browser tools, so it resumes with the same tools (older saves: true)
+type SavedRun = { reason: PauseReason; help: { reason: string; url: string | null } | null; runState: string; browse?: boolean }
 
 // Kept in the RunState, so it survives between slices: keep it small and JSON-only
 type RunMemory = {
@@ -578,6 +579,19 @@ function buildTools(session: Session) {
   const memoryOf = (ctx: { context: unknown } | undefined) => (ctx?.context ?? newMemory()) as RunMemory
   // Every web or computer action counts against the attempt's budget
   const outOfActions = (memory: RunMemory) => ++memory.actions > MAX_ACTIONS
+
+  // Saves the run before a tool starts if the user has control or the slice has expired
+  const pauseGate = async () => {
+    if (await userHasControl(session)) {
+      session.pause ??= { reason: "takeover", help: null }
+      return true
+    }
+    if (Date.now() > session.deadline) {
+      session.pause ??= { reason: "timeslice", help: null }
+      return true
+    }
+    return false
+  }
   const OUT_OF_ACTIONS = "You have used all your computer actions for this task. Stop using the computer and call finish_task now with what you have."
 
   const computer = lenientTool({
@@ -586,18 +600,7 @@ function buildTools(session: Session) {
     description:
       "Use your desktop: screenshot, open_browser, open_url, click, double_click, right_click, type, press_key, scroll, drag, wait or shell. One action per call; you get a fresh screenshot after each one. Fill only the fields the action needs and set the others to null.",
     parameters: computerParams,
-    // Stops the run (it's saved and resumed later) when the step is out of time or the user took over
-    needsApproval: async (_ctx, _input) => {
-      if (await userHasControl(session)) {
-        session.pause ??= { reason: "takeover", help: null }
-        return true
-      }
-      if (Date.now() > session.deadline) {
-        session.pause ??= { reason: "timeslice", help: null }
-        return true
-      }
-      return false
-    },
+    needsApproval: pauseGate,
     execute: async (input, ctx) => {
       const memory = memoryOf(ctx)
       if (outOfActions(memory)) return OUT_OF_ACTIONS
@@ -780,17 +783,7 @@ function buildTools(session: Session) {
       query: z.string().min(1).describe("What to search for"),
       site: z.string().nullable().default(null).describe('Only for platform "web": a site to search within, e.g. "socialmediatoday.com"'),
     }),
-    needsApproval: async () => {
-      if (await userHasControl(session)) {
-        session.pause ??= { reason: "takeover", help: null }
-        return true
-      }
-      if (Date.now() > session.deadline) {
-        session.pause ??= { reason: "timeslice", help: null }
-        return true
-      }
-      return false
-    },
+    needsApproval: pauseGate,
     execute: async ({ platform, query, site }, ctx) => {
       const memory = memoryOf(ctx)
       if (outOfActions(memory)) return OUT_OF_ACTIONS
@@ -808,6 +801,7 @@ function buildTools(session: Session) {
   const readPage = lenientTool({
     errorFunction: toolError,
     name: "read_page",
+    needsApproval: pauseGate,
     description:
       "Read the text of a web page (article, blog post, news, documentation) without scrolling. Doesn't work for pages that need a login or JavaScript (Instagram, TikTok, X): view those in the browser.",
     parameters: z.object({ url: z.string() }),
@@ -842,6 +836,7 @@ function buildTools(session: Session) {
   const saveFinding = lenientTool({
     errorFunction: toolError,
     name: "save_research_finding",
+    needsApproval: pauseGate,
     description:
       "Save one research finding to the database so the team can find it later: a trend, hashtag, competitor insight, audience insight, content idea, news item, platform update or general insight, with its sources.",
     parameters: z.object({
@@ -883,6 +878,7 @@ function buildTools(session: Session) {
   const writeCopyTool = lenientTool({
     errorFunction: toolError,
     name: "write_copy",
+    needsApproval: pauseGate,
     description:
       "Draft social media text in 1-5 variations: post, caption, thread, carousel, video_script, story, hashtags (a hashtag set) or content_idea, for one platform. Returns the variations; refine the best and save it with save_content_draft.",
     parameters: z.object({
@@ -919,6 +915,7 @@ function buildTools(session: Session) {
   const saveDraft = lenientTool({
     errorFunction: toolError,
     name: "save_content_draft",
+    needsApproval: pauseGate,
     description: "Save one finished post, caption, thread, carousel, script, story, hashtag set or content idea as a draft in the database, with its images.",
     parameters: z.object({
       platform: z.string().default("instagram"),
@@ -959,6 +956,7 @@ function buildTools(session: Session) {
   const generate = lenientTool({
     errorFunction: toolError,
     name: "generate_image",
+    needsApproval: pauseGate,
     description: "Generate a new image (Gemini) from a detailed prompt. Returns its permanent URL; it's also shown with your results.",
     parameters: z.object({
       prompt: z.string().min(1).describe("Detailed: subject, style, colors, composition, any text to show"),
@@ -992,6 +990,7 @@ function buildTools(session: Session) {
   const edit = lenientTool({
     errorFunction: toolError,
     name: "edit_image",
+    needsApproval: pauseGate,
     description:
       "Transform an image with ImageKit: remove_background, change_background (prompt), edit (prompt), upscale, extend (width, height, optional prompt), smart_crop (width, height), platform_size (preset) or add_text (text, position). Returns the new image's permanent URL.",
     parameters: z.object({
@@ -1176,6 +1175,7 @@ export async function runComputerSlice({
   const agentKey = task.agentKey as ComputerAgentKey
   const saved = await computers.getRunState(task.id)
   const resuming = Boolean(saved && saved.attempt === attempt)
+  const savedRun = saved && resuming ? (JSON.parse(saved.state) as SavedRun) : null
   const taskText = [task.title, task.instructions, clarifications, feedback].filter(Boolean).join("\n")
   const session: Session = {
     sandbox: null,
@@ -1189,26 +1189,29 @@ export async function runComputerSlice({
     screenshots: [],
     pause: null,
     control: { checkedAt: 0, user: false },
-    // A saved run always used the computer, so it resumes with the same (browser) tools
-    browse: resuming || toolPlan(agentKey, taskText).browse,
+    // A resumed run keeps the tools it started with
+    browse: savedRun ? savedRun.browse !== false : toolPlan(agentKey, taskText).browse,
   }
   if (await userHasControl(session)) return { kind: "takeover" }
 
   const agent = buildAgent(session, campaignName)
   let input: AgentInputItem[] | RunState<RunMemory, typeof agent>
-  if (saved && resuming) {
-    const { reason, runState } = JSON.parse(saved.state) as SavedRun
+  if (savedRun) {
+    const { reason, runState } = savedRun
     const state = await RunState.fromString<RunMemory, typeof agent>(agent, runState)
     for (const item of state.getInterruptions()) {
-      // Out-of-time actions run as planned; after the user had control the screen may differ
-      if (item.name === "ask_user_for_help" || reason === "timeslice") state.approve(item)
+      // Out-of-time actions run as planned. After the user had control the screen may differ, so only
+      // screen actions (clicks at coordinates, typing) are cancelled; saving or writing still runs
+      if (reason === "timeslice" || item.name !== "computer") state.approve(item)
       else state.reject(item, { message: RESUME_AFTER_USER })
     }
     input = state
     await setActivity(session, "Picking up where it left off")
-    // A saved run was using the computer (only computer actions and help requests pause a run)
-    await desktop(session)
-    await takeScreenshot(session)
+    // Refresh the screen after a browsing run resumes
+    if (session.browse) {
+      await desktop(session)
+      await takeScreenshot(session)
+    }
   } else {
     if (saved) await computers.deleteRunState(task.id)
     const research = await researchContext(session)
@@ -1236,8 +1239,8 @@ export async function runComputerSlice({
     const askedForHelp = result.interruptions.some((i) => i.name === "ask_user_for_help")
     const pause = session.pause ?? { reason: "timeslice" as const, help: null }
     const reason: PauseReason = askedForHelp ? "needs_user" : pause.reason
-    const savedRun: SavedRun = { reason, help: pause.help, runState: result.state.toString() }
-    await computers.saveRunState(task.id, attempt, JSON.stringify(savedRun))
+    const toSave: SavedRun = { reason, help: pause.help, runState: result.state.toString(), browse: session.browse }
+    await computers.saveRunState(task.id, attempt, JSON.stringify(toSave))
     if (reason === "needs_user") {
       return { kind: "needs_user", reason: pause.help?.reason ?? "Please help the agent on its computer.", url: pause.help?.url ?? null }
     }

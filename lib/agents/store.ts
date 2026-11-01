@@ -3,6 +3,7 @@ import type { createServerClient } from "@insforge/sdk/ssr"
 import { iso, nextOccurrence } from "@/lib/agents/schedule"
 import { THREAD_KEYS, type AgentKey, type ComputerAgentKey, type ThreadKey } from "@/lib/agent-roles"
 import {
+  ACTIVE_TASK_STATUSES,
   OPEN_REQUEST_STATUSES,
   type AgentActivities,
   type AgentMessage,
@@ -449,6 +450,18 @@ export class AgentStore {
       .in("request_id", requestIds)
       .order("position", { ascending: true })
     if (error) throw new StoreError("load tasks", error)
+    return ((data ?? []) as Row[]).map(toTask)
+  }
+
+  async listActiveTasks(limit = 12) {
+    const { data, error } = await this.db
+      .from("agent_task")
+      .select(TASK_COLUMNS)
+      .eq("campaign_id", this.campaignId)
+      .in("status", ACTIVE_TASK_STATUSES)
+      .order("position", { ascending: true })
+      .limit(limit)
+    if (error) throw new StoreError("load active tasks", error)
     return ((data ?? []) as Row[]).map(toTask)
   }
 

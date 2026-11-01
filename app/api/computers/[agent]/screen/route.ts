@@ -34,7 +34,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       try {
         const sandbox = await connectDesktop(computer.sandboxId)
         const shot = await sandbox.screenshot()
-        cache.set(computer.sandboxId, { at: Date.now(), png: shot })
+        const now = Date.now()
+        cache.set(computer.sandboxId, { at: now, png: shot })
+        for (const [id, entry] of cache) {
+          if (now - entry.at >= CACHE_MS) cache.delete(id)
+        }
         return png(shot, true)
       } catch (error) {
         console.error(`Live screenshot of the ${agent} computer failed`, error)

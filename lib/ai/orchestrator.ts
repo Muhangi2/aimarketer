@@ -50,7 +50,7 @@ export class Orchestrator {
         this.store.listUpcomingTasks(Date.now() + SCHEDULE_LOOKAHEAD_MS),
       ])
       const openTasks = open ? await this.store.listTasks(open.id) : []
-      const activeTasks = await this.loadActiveTasks(recent, open)
+      const activeTasks = await this.store.listActiveTasks()
       const decision = await decide({
         campaignName: this.campaignName,
         history: history.filter((m) => m.id !== userMessage.id),
@@ -166,14 +166,6 @@ export class Orchestrator {
   }
 
   // ---- State changes ----
-
-  // Unfinished tasks from recent requests that are still in progress
-  private async loadActiveTasks(recent: AgentRequestRecord[], open: AgentRequestRecord | null) {
-    const ids = new Set(recent.filter((r) => ["running", "waiting", "planning"].includes(r.status)).map((r) => r.id))
-    if (open) ids.add(open.id)
-    const tasks = await this.store.listTasksForRequests([...ids])
-    return tasks.filter((t) => ACTIVE_TASK_STATUSES.includes(t.status)).slice(0, 12)
-  }
 
   /**
    * The user added details for work already assigned: they go into the existing tasks' instructions
