@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react"
 import { cn } from "cn"
-import type { OfficeScene } from "@/lib/office-scene"
+import type { OfficeScene, OfficeSeat } from "@/lib/office-scene"
+import type { LiveStatus } from "@/lib/agents/live-status"
 import { AgentOffice } from "@/components/office/agent-office"
 
 export function AgentOfficePanel({
@@ -9,12 +10,15 @@ export function AgentOfficePanel({
   selectedSeatId,
   onSelectSeat,
   pausedSeatIds,
+  seatStatus,
 }: {
   scene: OfficeScene
   className?: string
   selectedSeatId?: string | null
   onSelectSeat?: (seatId: string) => void
   pausedSeatIds?: ReadonlySet<string>
+  // Live status and activity shown on each agent's tag
+  seatStatus?: (seat: OfficeSeat) => LiveStatus
 }) {
   const working = scene.seats.length - (pausedSeatIds?.size ?? 0)
 
@@ -41,6 +45,7 @@ export function AgentOfficePanel({
         selectedSeatId={selectedSeatId}
         onSelectSeat={onSelectSeat}
         pausedSeatIds={pausedSeatIds}
+        seatStatus={seatStatus}
         className="lg:aspect-auto lg:min-h-0 lg:flex-1"
       />
     </section>

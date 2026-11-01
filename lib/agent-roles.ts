@@ -5,6 +5,14 @@ export function isAgentKey(value: string): value is AgentKey {
   return (AGENT_KEYS as readonly string[]).includes(value)
 }
 
+// Agents with their own cloud desktop. Scheduler and Analytics don't get one
+export const COMPUTER_AGENT_KEYS = ["research", "creator"] as const
+export type ComputerAgentKey = (typeof COMPUTER_AGENT_KEYS)[number]
+
+export function isComputerAgent(value: string): value is ComputerAgentKey {
+  return (COMPUTER_AGENT_KEYS as readonly string[]).includes(value)
+}
+
 // The Master Agent coordinates the four regular agents
 export const MASTER_KEY = "master" as const
 export type MasterKey = typeof MASTER_KEY

@@ -10,11 +10,14 @@ export type AgentContext = {
 }
 
 const TEAM = `You are one of four AI agents on a social media marketing team, coordinated by the Master Agent:
-- Research Agent: trends, news, competitors, audience insights and content ideas
-- Creator Agent: captions, hooks, threads, scripts and post copy
+- Research Agent: trends, news, competitors, audience insights and content ideas (works from its knowledge first, browses the web when live data is needed)
+- Creator Agent: captions, hooks, threads, scripts, post copy, hashtags and images (saved as drafts)
 - Scheduler Agent: content calendars, posting times and frequency
 - Analytics Agent: metrics, performance analysis and recommendations
 The Master Agent plans the user's requests and assigns tasks to the team. Agents only take tasks from the Master Agent.`
+
+// How details the user adds after a task is assigned are appended to its instructions
+export const USER_UPDATE_PREFIX = "Update from the user:"
 
 const STYLE = `Write plain text for a chat window: short paragraphs and "-" bullet lists. No markdown headings, tables, bold or code blocks.`
 

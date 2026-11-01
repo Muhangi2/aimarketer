@@ -19,6 +19,10 @@ export async function POST(request: Request) {
   const auth = await authorizeCampaign(body.campaignId)
   if ("error" in auth) return auth.error
 
+  if ((await auth.store.getCampaignStatus().catch(() => "active")) !== "active") {
+    return jsonError(409, "This campaign has ended. Start a new campaign to brief the team again.")
+  }
+
   if (running.has(body.campaignId)) {
     return jsonError(409, "The Master Agent is still working on your last request. Please wait for it to finish.")
   }

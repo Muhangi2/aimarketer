@@ -89,5 +89,7 @@ export async function completeJSON<T>(
       { role: "user", content: `That answer was not valid (${lastProblem}). Reply again with only the JSON object in the exact format requested.` }
     )
   }
+  const lastAnswer = conversation.at(-2)?.content
+  console.error(`[llm] ${AI_MODEL} gave an invalid answer ${attempts} times: ${lastProblem}\nLast answer:\n${String(lastAnswer).slice(0, 2000)}`)
   throw new ModelFormatError(lastProblem)
 }

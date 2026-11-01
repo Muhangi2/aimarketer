@@ -1,16 +1,21 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { MASTER_KEY, THREAD_KEYS, type AgentKey, type ThreadKey } from "@/lib/agent-roles"
+import { MASTER_KEY, THREAD_KEYS, isComputerAgent, type AgentKey, type ComputerAgentKey, type ThreadKey } from "@/lib/agent-roles"
 import type { OfficeSeat } from "@/lib/office-scene"
 import { DISPATCH_WINDOW_MS } from "@/lib/agents/schedule"
+import { liveStatus } from "@/lib/agents/live-status"
 import {
   RUNNING_TASK_STATUSES,
+  type AgentActivities,
   type AgentMessage,
   type AgentRequestRecord,
   type AgentStates,
   type AgentStatus,
   type AgentTaskRecord,
+  type ArtifactRecord,
+  type CampaignStatus,
+  type ComputerRecord,
   type OrchestratorEvent,
   type TaskRunRecord,
   type WorkspaceSnapshot,
@@ -19,6 +24,10 @@ import {
 // Tasks run in the background (Inngest), so the workspace polls for their progress
 const ACTIVE_POLL_MS = 10_000
 const IDLE_POLL_MS = 60_000
+// While an agent works on its computer, its activity ("Opening instagram.com") updates this often
+const LIVE_POLL_MS = 4_000
+
+export type ComputerAction = "take_over" | "hand_back" | "start" | "pause" | "heartbeat"
 
 let idCounter = 0
 const localId = () => `local-${Date.now()}-${++idCounter}`
@@ -88,6 +97,12 @@ export function useAgentWorkspace({
   )
   const [runs, setRuns] = useState<TaskRunRecord[]>(snapshot.runs)
   const [states, setStates] = useState<AgentStates>(snapshot.states)
+  const [activities, setActivities] = useState<AgentActivities>(snapshot.activities)
+  const [artifacts, setArtifacts] = useState<ArtifactRecord[]>(snapshot.artifacts)
+  const [computers, setComputers] = useState<ComputerRecord[]>(snapshot.computers)
+  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(snapshot.campaignStatus)
+  // The computer open in the large viewer
+  const [viewerKey, setViewerKey] = useState<ComputerAgentKey | null>(null)
   // Agents with a reply or task in progress
   const [typing, setTyping] = useState<ReadonlySet<ThreadKey>>(
     () => new Set(THREAD_KEYS.filter((k) => snapshot.states[k] === "working"))
@@ -300,6 +315,33 @@ export function useAgentWorkspace({
     }
   }
 
+  function patchComputer(key: ComputerAgentKey, patch: Partial<ComputerRecord>) {
+    setComputers((prev) => {
+      const existing = prev.find((c) => c.agentKey === key)
+      if (existing) return prev.map((c) => (c.agentKey === key ? { ...c, ...patch } : c))
+      const blank: ComputerRecord = { agentKey: key, status: "none", control: "agent", currentTaskId: null, activity: null, lastActiveAt: Date.now(), screenshotAt: null, error: null }
+      return [...prev, { ...blank, ...patch }]
+    })
+  }
+
+  /** Take over / hand back, start / pause an agent's computer. Throws with a readable message. */
+  async function computerAction(key: ComputerAgentKey, action: ComputerAction) {
+    const res = await authedFetch(`/api/computers/${key}/control`, json({ campaignId, action }))
+    if (!res.ok) throw await errorFrom(res)
+    const { computer } = (await res.json()) as { computer: ComputerRecord | null }
+    if (computer) patchComputer(key, computer)
+    if (action !== "heartbeat") void refresh()
+    return computer
+  }
+
+  /** Stops the campaign's plans and shuts its computers down for good. */
+  async function endCampaign() {
+    const res = await authedFetch("/api/campaigns/end", json({ campaignId }))
+    if (!res.ok) throw await errorFrom(res)
+    setCampaignStatus("ending")
+    void refresh()
+  }
+
   async function clearChat(key: ThreadKey) {
     requestsInFlight.current.get(key)?.abort()
     const previous = messages[key]
@@ -337,6 +379,10 @@ export function useAgentWorkspace({
       setTasks(Object.fromEntries(next.tasks.map((t) => [t.id, t])))
       setRuns(next.runs)
       setStates(next.states)
+      setActivities(next.activities)
+      setArtifacts(next.artifacts)
+      setComputers(next.computers)
+      setCampaignStatus(next.campaignStatus)
       setTyping((prev) => new Set(THREAD_KEYS.filter((k) => next.states[k] === "working" || (busyRef.current.has(k) && prev.has(k)))))
     } catch {
       // Try again on the next tick
@@ -350,17 +396,21 @@ export function useAgentWorkspace({
       (t) =>
         RUNNING_TASK_STATUSES.includes(t.status) || (t.status === "pending" && t.scheduledAt <= Date.now() + DISPATCH_WINDOW_MS)
     )
-  const hasScheduledWork = taskValues.some((t) => t.status === "pending")
+  const hasScheduledWork = taskValues.some((t) => t.status === "pending" || t.status === "waiting_for_user")
+  const hasLiveComputer =
+    campaignStatus === "ending" ||
+    computers.some((c) => c.control === "user" || c.status === "starting" || c.status === "pausing") ||
+    taskValues.some((t) => isComputerAgent(t.agentKey) && RUNNING_TASK_STATUSES.includes(t.status))
 
   useEffect(() => {
-    if (busy.size > 0 || (!hasActiveWork && !hasScheduledWork)) return
+    if (busy.size > 0 || (!hasActiveWork && !hasScheduledWork && !hasLiveComputer)) return
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh()
-    }, hasActiveWork ? ACTIVE_POLL_MS : IDLE_POLL_MS)
+    }, hasLiveComputer ? LIVE_POLL_MS : hasActiveWork ? ACTIVE_POLL_MS : IDLE_POLL_MS)
     return () => window.clearInterval(timer)
     // refresh only reads refs and stable setters
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveWork, hasScheduledWork, busy.size, campaignId])
+  }, [hasActiveWork, hasScheduledWork, hasLiveComputer, busy.size, campaignId])
 
   // Catch up when the user comes back to the tab
   useEffect(() => {
@@ -378,7 +428,19 @@ export function useAgentWorkspace({
     [seats, states]
   )
 
+  const computerFor = (key: ComputerAgentKey) => computers.find((c) => c.agentKey === key) ?? null
+  const statusFor = (key: AgentKey) =>
+    liveStatus({
+      agentKey: key,
+      states,
+      activities,
+      tasks: taskList,
+      computer: isComputerAgent(key) ? computerFor(key) : null,
+      campaignStatus,
+    })
+
   return {
+    campaignId,
     selectedKey,
     selectedSeat: selectedKey && selectedKey !== MASTER_KEY ? (seatByKey.get(selectedKey) ?? null) : null,
     seatFor: (key: AgentKey) => seatByKey.get(key) ?? null,
@@ -394,6 +456,18 @@ export function useAgentWorkspace({
     send,
     togglePause,
     clearChat,
+    activities,
+    artifacts,
+    computers,
+    computerFor,
+    statusFor,
+    campaignStatus,
+    computerAction,
+    endCampaign,
+    refresh,
+    viewerKey,
+    openViewer: (key: ComputerAgentKey) => setViewerKey(key),
+    closeViewer: () => setViewerKey(null),
   }
 }
 

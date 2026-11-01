@@ -12,8 +12,16 @@ export type TaskExecuteEvent = {
   }
 }
 
+// The user clicked Done (after logging in) or Hand back on an agent's computer
+export type ComputerResumeEvent = { data: { taskId: string; campaignId: string } }
+
+// The user ended a campaign: stop its plans and shut its computers down
+export type CampaignEndEvent = { data: { campaignId: string; userId: string } }
+
 type Events = {
   "task/execute": TaskExecuteEvent
+  "computer/resume": ComputerResumeEvent
+  "campaign/end": CampaignEndEvent
 }
 
 // Locally, INNGEST_DEV=1 points this at the dev server (npm run inngest:dev)
