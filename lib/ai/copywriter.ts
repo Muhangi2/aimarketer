@@ -73,7 +73,10 @@ Reply with only a JSON object: {"items": [{"title": "short internal label", "bod
     .filter(Boolean)
     .join("\n")
 
-  const result = await completeJSON(copySchema, [
+  const result = await completeJSON(copySchema.refine((value) => value.items.length === req.count, {
+    message: `Expected exactly ${req.count} items`,
+    path: ["items"],
+  }), [
     { role: "system", content: system },
     { role: "user", content: user },
   ], { temperature: 0.8 })

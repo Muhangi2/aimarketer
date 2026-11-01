@@ -416,24 +416,26 @@ function buildTools(session: Session) {
   const outOfActions = (memory: RunMemory) => ++memory.actions > MAX_ACTIONS
   const OUT_OF_ACTIONS = "You have used all your computer actions for this task. Stop using the computer and call finish_task now with what you have."
 
+  // Save the run before a tool starts if the user has control or the slice has expired.
+  const pauseGate = async () => {
+    if (await userHasControl(session)) {
+      session.pause ??= { reason: "takeover", help: null }
+      return true
+    }
+    if (Date.now() > session.deadline) {
+      session.pause ??= { reason: "timeslice", help: null }
+      return true
+    }
+    return false
+  }
+
   const computer = tool({
     errorFunction: toolError,
     name: "computer",
     description:
       "Use your desktop: screenshot, open_browser, open_url, click, double_click, right_click, type, press_key, scroll, drag, wait or shell. One action per call; you get a fresh screenshot after each one. Fill only the fields the action needs and set the others to null.",
     parameters: computerParams,
-    // Stops the run (it's saved and resumed later) when the step is out of time or the user took over
-    needsApproval: async (_ctx, _input) => {
-      if (await userHasControl(session)) {
-        session.pause ??= { reason: "takeover", help: null }
-        return true
-      }
-      if (Date.now() > session.deadline) {
-        session.pause ??= { reason: "timeslice", help: null }
-        return true
-      }
-      return false
-    },
+    needsApproval: pauseGate,
     execute: async (input, ctx) => {
       const memory = memoryOf(ctx)
       if (outOfActions(memory)) return OUT_OF_ACTIONS
@@ -624,6 +626,7 @@ function buildTools(session: Session) {
   const uploadFile = tool({
     errorFunction: toolError,
     name: "upload_file",
+    needsApproval: pauseGate,
     description: "Upload a file from your computer to get a permanent URL that teammates can use.",
     parameters: z.object({ path: z.string().describe("e.g. ~/output/carousel-1.png") }),
     execute: async ({ path }, ctx) => {
@@ -639,6 +642,7 @@ function buildTools(session: Session) {
   const downloadFile = tool({
     errorFunction: toolError,
     name: "download_file",
+    needsApproval: pauseGate,
     description: "Download a file by URL (for example a teammate's image) into one of your folders.",
     parameters: z.object({
       url: z.string(),
@@ -660,6 +664,7 @@ function buildTools(session: Session) {
   const listFiles = tool({
     errorFunction: toolError,
     name: "list_files",
+    needsApproval: pauseGate,
     description: "List the files in ~/research, ~/assets and ~/output.",
     parameters: z.object({}),
     execute: async () => {
@@ -678,17 +683,7 @@ function buildTools(session: Session) {
       query: z.string().min(1).describe("What to search for"),
       site: z.string().nullable().default(null).describe('Only for platform "web": a site to search within, e.g. "socialmediatoday.com"'),
     }),
-    needsApproval: async () => {
-      if (await userHasControl(session)) {
-        session.pause ??= { reason: "takeover", help: null }
-        return true
-      }
-      if (Date.now() > session.deadline) {
-        session.pause ??= { reason: "timeslice", help: null }
-        return true
-      }
-      return false
-    },
+    needsApproval: pauseGate,
     execute: async ({ platform, query, site }, ctx) => {
       const memory = memoryOf(ctx)
       if (outOfActions(memory)) return OUT_OF_ACTIONS
@@ -706,6 +701,7 @@ function buildTools(session: Session) {
   const readPage = tool({
     errorFunction: toolError,
     name: "read_page",
+    needsApproval: pauseGate,
     description:
       "Read the text of a web page (article, blog post, news, documentation) without scrolling. Doesn't work for pages that need a login or JavaScript (Instagram, TikTok, X): view those in the browser.",
     parameters: z.object({ url: z.string() }),
@@ -742,6 +738,7 @@ function buildTools(session: Session) {
   const saveFinding = tool({
     errorFunction: toolError,
     name: "save_research_finding",
+    needsApproval: pauseGate,
     description:
       "Save one research finding to the database so the team can find it later: a trend, hashtag, competitor insight, audience insight, content idea, news item, platform update or general insight, with its sources.",
     parameters: z.object({
@@ -782,6 +779,7 @@ function buildTools(session: Session) {
   const writeCopyTool = tool({
     errorFunction: toolError,
     name: "write_copy",
+    needsApproval: pauseGate,
     description:
       "Draft social media text in 1-5 variations: post, caption, thread, carousel, video_script, story, hashtags (a hashtag set) or content_idea, for one platform. Returns the variations; refine the best and save it with save_content_draft.",
     parameters: z.object({
@@ -818,6 +816,7 @@ function buildTools(session: Session) {
   const saveDraft = tool({
     errorFunction: toolError,
     name: "save_content_draft",
+    needsApproval: pauseGate,
     description: "Save one finished post, caption, thread, carousel, script, story, hashtag set or content idea as a draft in the database, with its images.",
     parameters: z.object({
       platform: z.string(),
@@ -858,6 +857,7 @@ function buildTools(session: Session) {
   const generate = tool({
     errorFunction: toolError,
     name: "generate_image",
+    needsApproval: pauseGate,
     description: "Generate a new image (Gemini) from a detailed prompt. Returns its permanent URL; it's also shown with your results.",
     parameters: z.object({
       prompt: z.string(),
@@ -888,6 +888,7 @@ function buildTools(session: Session) {
   const edit = tool({
     errorFunction: toolError,
     name: "edit_image",
+    needsApproval: pauseGate,
     description:
       "Transform an image with ImageKit: remove_background, change_background (prompt), edit (prompt), upscale, extend (width, height, optional prompt), smart_crop (width, height), platform_size (preset) or add_text (text, position). Returns the new image's permanent URL.",
     parameters: z.object({
@@ -1059,7 +1060,7 @@ export async function runComputerSlice({
     }
     input = state
     await setActivity(session, "Picking up where it left off")
-    // A saved run was using the computer (only computer actions and help requests pause a run)
+    // Refresh the screen after a saved run resumes.
     await desktop(session)
     await takeScreenshot(session)
   } else {

@@ -187,7 +187,14 @@ ${schedule || "- nothing"}${assigned ? `\n\nTasks already assigned (not finished
   if (decision.action === "update") {
     const updates = decision.updates.filter((u) => refs.has(u.task))
     // Nothing valid to update: plan the work instead if the model also gave tasks
-    if (updates.length === 0) return { ...decision, action: decision.tasks.length > 0 ? "plan" : "reply", updates: [] }
+    if (updates.length === 0) return {
+      ...decision,
+      action: decision.tasks.length > 0 ? "plan" : "reply",
+      message: decision.tasks.length > 0
+        ? "I couldn't match those details to an assigned task. I'll plan the work instead."
+        : "I couldn't match those details to an assigned task. Please tell me which task you meant.",
+      updates: [],
+    }
     return { ...decision, tasks: [], updates }
   }
   return decision
