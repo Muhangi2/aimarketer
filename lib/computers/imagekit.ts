@@ -1,4 +1,5 @@
 import "server-only"
+import { getInsForgeAdmin } from "@/lib/insforge/admin"
 
 /*
  * ImageKit: permanent URLs for files agents make, and ImageKit AI image edits.
@@ -24,7 +25,7 @@ export function imageKitConfigured() {
 function config() {
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY
   const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, "")
-  if (!privateKey || !endpoint) throw new ImageKitError("File uploads are not set up (IMAGEKIT_PRIVATE_KEY and IMAGEKIT_URL_ENDPOINT).")
+  if (!privateKey || !endpoint) throw new ImageKitError("Image edits need ImageKit (IMAGEKIT_PRIVATE_KEY and IMAGEKIT_URL_ENDPOINT). Generated images are still saved without it.")
   return { privateKey, endpoint }
 }
 
@@ -35,11 +36,43 @@ export function isImageKitUrl(url: string) {
 
 export type UploadedFile = { url: string; fileId: string; name: string; size: number; mimeType: string | null }
 
-/** Uploads bytes (or a public URL ImageKit fetches itself) and returns the file's permanent URL. */
-export async function uploadToImageKit(
+// Public InsForge bucket used when ImageKit isn't set up
+const FALLBACK_BUCKET = "agent-files"
+
+/** Stores the file in the project's InsForge storage and returns its public URL. */
+async function uploadToInsForge(
   file: Uint8Array | string,
   { fileName, folder, mimeType }: { fileName: string; folder: string; mimeType?: string }
 ): Promise<UploadedFile> {
+  let bytes: Uint8Array
+  let type = mimeType
+  if (typeof file === "string") {
+    const res = await fetch(file)
+    if (!res.ok) throw new ImageKitError(`Could not download ${file} (${res.status}).`)
+    bytes = new Uint8Array(await res.arrayBuffer())
+    type ??= res.headers.get("content-type")?.split(";")[0] ?? undefined
+  } else {
+    bytes = file
+  }
+  const name = safeFileName(fileName)
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const key = `${folder.replace(/^\/+|\/+$/g, "")}/${stamp}-${name}`
+  const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: type ?? "application/octet-stream" })
+  const { data, error } = await getInsForgeAdmin().storage.from(FALLBACK_BUCKET).upload(key, blob)
+  if (error || !data?.url) throw new ImageKitError(`File upload failed: ${error?.message ?? "no URL returned"}`)
+  return { url: data.url, fileId: data.key, name, size: data.size ?? bytes.byteLength, mimeType: type ?? null }
+}
+
+/**
+ * Uploads bytes (or a public URL) and returns the file's permanent URL. Uses ImageKit when it's
+ * set up (needed for AI image edits), otherwise the project's InsForge storage.
+ */
+export async function uploadToImageKit(
+  file: Uint8Array | string,
+  options: { fileName: string; folder: string; mimeType?: string }
+): Promise<UploadedFile> {
+  if (!imageKitConfigured()) return uploadToInsForge(file, options)
+  const { fileName, folder, mimeType } = options
   const { privateKey } = config()
   const form = new FormData()
   // A string is a URL ImageKit downloads itself

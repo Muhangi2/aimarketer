@@ -1,7 +1,7 @@
 import "server-only"
 import { CommandExitError, Sandbox, SandboxNotFoundError } from "@e2b/desktop"
 import type { ComputerAgentKey } from "@/lib/agent-roles"
-import { safeFileName, uploadToImageKit, imageKitConfigured } from "@/lib/computers/imagekit"
+import { safeFileName, uploadToImageKit } from "@/lib/computers/imagekit"
 import type { ComputerRow, ComputerStore } from "@/lib/computers/store"
 
 /*
@@ -167,7 +167,7 @@ export async function shutDownDesktop(store: ComputerStore, computer: ComputerRo
   if (computer.sandboxId) {
     try {
       const sandbox = await connectDesktop(computer.sandboxId)
-      if (imageKitConfigured()) {
+      {
         const list = await runShell(sandbox, `find ${Object.values(FOLDERS).join(" ")} -type f -size -${MAX_LEFTOVER_BYTES}c 2>/dev/null | head -n ${MAX_LEFTOVER_FILES}`)
         for (const path of list.stdout.split("\n").map((l) => l.trim()).filter(Boolean)) {
           try {

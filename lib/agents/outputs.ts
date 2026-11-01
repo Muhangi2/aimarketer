@@ -248,6 +248,19 @@ export class OutputStore {
     return ((data ?? []) as Row[]).map(toFinding)
   }
 
+  /** The findings saved for one request, newest first: what the Creator Agent writes from. */
+  async listRequestFindings(requestId: string, limit = 10) {
+    const { data, error } = await this.db
+      .from("research_finding")
+      .select(FINDING_COLUMNS)
+      .eq("campaign_id", this.campaignId)
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (error) throw new StoreError("load research findings", error)
+    return ((data ?? []) as Row[]).map(toFinding)
+  }
+
   async listTaskDrafts(taskId: string) {
     const { data, error } = await this.db
       .from("content_draft")

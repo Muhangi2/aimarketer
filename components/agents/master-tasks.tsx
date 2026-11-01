@@ -27,6 +27,7 @@ export function MasterTasks({
   artifacts = [],
   seatFor,
   onHelp,
+  campaignId,
 }: {
   requests: AgentRequestRecord[]
   tasks: AgentTaskRecord[]
@@ -35,6 +36,7 @@ export function MasterTasks({
   seatFor: (key: AgentKey) => OfficeSeat | null
   // Opens an agent's computer, for tasks waiting for the user
   onHelp?: (key: ComputerAgentKey) => void
+  campaignId?: string
 }) {
   if (requests.length === 0) {
     return (
@@ -102,6 +104,7 @@ export function MasterTasks({
                       artifacts={artifacts.filter((a) => a.taskId === task.id)}
                       onHelp={onHelp && isComputerAgent(task.agentKey) ? () => onHelp(task.agentKey as ComputerAgentKey) : undefined}
                       prefix={seat ? <AgentAvatar seat={seat} className="size-7" /> : undefined}
+                      campaignId={campaignId}
                     />
                   )
                 })}

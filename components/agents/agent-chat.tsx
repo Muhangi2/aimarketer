@@ -52,6 +52,11 @@ function imagesFor(m: AgentMessage, tasks: AgentTaskRecord[], artifacts: Artifac
   return [...new Set([...fromTasks, ...imageUrlsIn(m.content)])]
 }
 
+// An image-ready update shows its picture, so the raw link is left out of the text
+function withoutImageLinks(text: string, images: string[]) {
+  return images.reduce((t, url) => t.replace(url, ""), text).trim()
+}
+
 // Only the newest help request of a request gets the button
 function lastHelpMessage(messages: AgentMessage[], requestId: string) {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -159,7 +164,10 @@ export function AgentChat({
             ? tasks.find((t) => t.status === "waiting_for_user" && t.requestId === m.requestId && isComputerAgent(t.agentKey))
             : undefined
           const between = m.recipient !== "user"
-          const images = m.kind === "result" || m.kind === "summary" ? imagesFor(m, tasks, artifacts) : []
+          const images =
+            m.kind === "result" || m.kind === "summary" ? imagesFor(m, tasks, artifacts) : m.kind === "update" ? imageUrlsIn(m.content) : []
+          // Image-ready updates: a small preview instead of the link
+          const imageUpdate = m.kind === "update" && images.length > 0
           return (
             <div key={m.id} className="flex max-w-[85%] gap-3 animate-in fade-in slide-in-from-bottom-1 duration-300">
               {avatar(m.sender)}
@@ -184,8 +192,8 @@ export function AgentChat({
                     m.error || m.kind === "error" ? "bg-destructive/10 text-destructive" : (KIND_TONE[m.kind] ?? "bg-muted")
                   )}
                 >
-                  {plainText(m.content)}
-                  <ImageStrip urls={images} className="mt-3 whitespace-normal" />
+                  {plainText(imageUpdate ? withoutImageLinks(m.content, images) : m.content)}
+                  <ImageStrip urls={images} small={imageUpdate} className="mt-3 whitespace-normal" />
                   {waiting && onHelp && m.id === lastHelpMessage(messages, waiting.requestId) && (
                     <Button size="sm" className="mt-3 flex h-8 rounded-lg" onClick={() => onHelp(waiting.agentKey as ComputerAgentKey)}>
                       <KeyRound /> Login now
