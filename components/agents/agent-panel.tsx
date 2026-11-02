@@ -177,6 +177,7 @@ export function AgentPanel({
               artifacts={workspace.artifacts}
               seatFor={workspace.seatFor}
               onHelp={openComputer}
+              campaignId={campaignId}
             />
           ) : (
             <AgentHistory
@@ -184,6 +185,7 @@ export function AgentPanel({
               runs={workspace.runs}
               artifacts={workspace.artifacts}
               agentName={role.name}
+              campaignId={campaignId}
               onHelp={hasComputer ? () => openComputer(agentKey as ComputerAgentKey) : undefined}
             />
           )}

@@ -26,11 +26,24 @@ export function chatModel() {
 }
 
 /**
- * Computer agents read screenshots, so they need a vision model. COMPUTER_MODEL picks one on the
- * same endpoint (e.g. gpt-4.1-mini on OpenAI, qwen2.5vl on Ollama); defaults to AI_MODEL.
+ * Computer agents (Research, Creator) read screenshots and call tools, so they need a fast vision
+ * model. COMPUTER_MODEL picks it (defaults to AI_MODEL). COMPUTER_BASE_URL / COMPUTER_API_KEY put
+ * them on another OpenAI-compatible endpoint than the rest of the team, e.g. Gemini's
+ * https://generativelanguage.googleapis.com/v1beta/openai/ with gemini-3.1-flash-lite.
  */
 export const COMPUTER_MODEL = process.env.COMPUTER_MODEL || AI_MODEL
 
+const globalForComputer = globalThis as { computerClient?: OpenAI }
+
+const computerClient = process.env.COMPUTER_BASE_URL
+  ? (globalForComputer.computerClient ??= new OpenAI({
+      baseURL: process.env.COMPUTER_BASE_URL,
+      apiKey: process.env.COMPUTER_API_KEY || process.env.AI_API_KEY || "none",
+      // Free tiers rate-limit: wait and retry instead of failing the step
+      maxRetries: 6,
+    }))
+  : aiClient
+
 export function computerModel() {
-  return new OpenAIChatCompletionsModel(aiClient, COMPUTER_MODEL)
+  return new OpenAIChatCompletionsModel(computerClient, COMPUTER_MODEL)
 }

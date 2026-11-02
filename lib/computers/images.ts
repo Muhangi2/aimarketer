@@ -5,16 +5,19 @@ import { fetchWhenReady, generatedImageUrl, imageKitConfigured } from "@/lib/com
 /*
  * Image generation for the Creator Agent. IMAGE_PROVIDER picks the first provider to try
  * (gemini by default); the others are fallbacks, skipped when their keys aren't set.
+ * cloudflare: FLUX.1 schnell on Workers AI, free within Cloudflare's daily allowance.
  */
 
-export type ImageProvider = "gemini" | "openai" | "imagekit"
+export type ImageProvider = "gemini" | "cloudflare" | "openai" | "imagekit"
 export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9"
 
-const PROVIDERS: ImageProvider[] = ["gemini", "openai", "imagekit"]
+const PROVIDERS: ImageProvider[] = ["gemini", "cloudflare", "openai", "imagekit"]
+const CLOUDFLARE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
 const GEMINI_MODEL = "gemini-2.5-flash-image"
 const OPENAI_MODEL = "gpt-image-1"
 
-export type GeneratedImage = { bytes: Uint8Array; mimeType: string; provider: ImageProvider }
+// square: the provider ignored the aspect ratio and made a square image
+export type GeneratedImage = { bytes: Uint8Array; mimeType: string; provider: ImageProvider; square?: boolean }
 
 function openAIImageKey() {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
@@ -25,6 +28,7 @@ function openAIImageKey() {
 
 function configured(provider: ImageProvider) {
   if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY)
+  if (provider === "cloudflare") return Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN)
   if (provider === "openai") return Boolean(openAIImageKey())
   return imageKitConfigured()
 }
@@ -55,6 +59,20 @@ async function withGemini(prompt: string, aspect: AspectRatio): Promise<Generate
   return { bytes: Buffer.from(part.inlineData.data, "base64"), mimeType: part.inlineData.mimeType ?? "image/png", provider: "gemini" }
 }
 
+async function withCloudflare(prompt: string, aspect: AspectRatio): Promise<GeneratedImage> {
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${CLOUDFLARE_MODEL}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` },
+    // 8 steps is the model's best quality
+    body: JSON.stringify({ prompt: prompt.slice(0, 2048), steps: 8 }),
+  })
+  const body = (await res.json().catch(() => null)) as { success?: boolean; result?: { image?: string }; errors?: { message?: string }[] } | null
+  if (!res.ok || !body?.success) throw new Error(`Cloudflare: ${body?.errors?.[0]?.message ?? res.status}`)
+  if (!body.result?.image) throw new Error("Cloudflare returned no image.")
+  // FLUX schnell on Workers AI always makes a square JPEG
+  return { bytes: Buffer.from(body.result.image, "base64"), mimeType: "image/jpeg", provider: "cloudflare", square: aspect !== "1:1" }
+}
+
 const OPENAI_SIZE: Record<AspectRatio, "1024x1024" | "1024x1536" | "1536x1024"> = {
   "1:1": "1024x1024",
   "4:5": "1024x1536",
@@ -78,11 +96,12 @@ async function withImageKit(prompt: string): Promise<GeneratedImage> {
 /** Generates an image with the first provider that works. */
 export async function generateImage(prompt: string, aspect: AspectRatio = "1:1"): Promise<GeneratedImage> {
   const order = providerOrder()
-  if (order.length === 0) throw new Error("No image provider is set up (GEMINI_API_KEY, OPENAI_API_KEY or ImageKit).")
+  if (order.length === 0) throw new Error("No image provider is set up (GEMINI_API_KEY, CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, OPENAI_API_KEY or ImageKit).")
   const problems: string[] = []
   for (const provider of order) {
     try {
       if (provider === "gemini") return await withGemini(prompt, aspect)
+      if (provider === "cloudflare") return await withCloudflare(prompt, aspect)
       if (provider === "openai") return await withOpenAI(prompt, aspect)
       return await withImageKit(prompt)
     } catch (error) {

@@ -146,10 +146,12 @@ export function imageUrlsIn(text: string) {
 }
 
 /** A row of image thumbnails shown under a chat message; each opens the full image. */
-export function ImageStrip({ urls, className }: { urls: string[]; className?: string }) {
+export function ImageStrip({ urls, className, small = false }: { urls: string[]; className?: string; small?: boolean }) {
   if (urls.length === 0) return null
+  // small: thumbnail-sized previews, e.g. for an "image ready" update
+  const grid = small ? "flex flex-wrap gap-2 [&>li]:w-28" : "grid grid-cols-2 gap-2 sm:grid-cols-3"
   return (
-    <ul className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${className ?? ""}`}>
+    <ul className={`${grid} ${className ?? ""}`}>
       {urls.slice(0, 12).map((url) => (
         <li key={url}>
           <a

@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { format, formatDistanceToNow } from "date-fns"
 import { CalendarClock, ChevronDown, ClipboardList, KeyRound, Repeat } from "lucide-react"
 import { cn } from "cn"
 import { describeRepeat, formatWhen } from "@/lib/agents/schedule"
 import type { AgentTaskRecord, ArtifactRecord, TaskRunRecord, TaskStatus } from "@/lib/agents/types"
 import { TaskArtifacts } from "@/components/agents/task-artifacts"
+import { TaskOutputs } from "@/components/agents/task-outputs"
 
 const RUN_STATUS: Record<TaskRunRecord["status"], string> = {
   running: "Running",
@@ -43,8 +45,11 @@ export function TaskItem({
   artifacts = [],
   prefix,
   onHelp,
+  campaignId,
 }: {
   task: AgentTaskRecord
+  // Shows the findings and drafts saved for research and creator tasks
+  campaignId?: string
   // Past runs, for repeating tasks
   runs?: TaskRunRecord[]
   // Files and links the agent made for this task
@@ -55,9 +60,12 @@ export function TaskItem({
 }) {
   const made = artifacts.filter((a) => a.kind === "image" || a.kind === "file").length
   const upcoming = task.status === "pending" || task.status === "queued"
+  // Saved outputs load the first time the task is opened
+  const [opened, setOpened] = useState(false)
+  const savesOutputs = campaignId && (task.agentKey === "research" || task.agentKey === "creator") && !upcoming
   return (
     <li className="rounded-xl border bg-background">
-      <details className="group">
+      <details className="group" onToggle={(e) => e.currentTarget.open && setOpened(true)}>
         <summary className="flex cursor-pointer list-none items-start gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
           {prefix ?? <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TASK_STATUS[task.status].dot)} />}
           <div className="min-w-0 flex-1">
@@ -114,6 +122,9 @@ export function TaskItem({
             </div>
           )}
           <TaskArtifacts artifacts={artifacts} />
+          {savesOutputs && opened && (
+            <TaskOutputs campaignId={campaignId} taskId={task.id} agentKey={task.agentKey as "research" | "creator"} version={task.updatedAt} />
+          )}
           {task.reviewFeedback && (
             <div>
               <p className="font-semibold text-muted-foreground">Master Agent review</p>
@@ -147,8 +158,10 @@ export function AgentHistory({
   artifacts = [],
   agentName,
   onHelp,
+  campaignId,
 }: {
   tasks: AgentTaskRecord[]
+  campaignId?: string
   runs?: TaskRunRecord[]
   artifacts?: ArtifactRecord[]
   agentName: string
@@ -179,6 +192,7 @@ export function AgentHistory({
             runs={runs.filter((r) => r.taskId === task.id)}
             artifacts={artifacts.filter((a) => a.taskId === task.id)}
             onHelp={onHelp}
+            campaignId={campaignId}
           />
         ))}
     </ol>
