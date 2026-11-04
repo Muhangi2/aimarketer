@@ -70,6 +70,8 @@ export function AgentChat({
   greeting,
   messages,
   typing,
+  activity = null,
+  onWatch,
   busy,
   paused,
   disabled = false,
@@ -87,6 +89,10 @@ export function AgentChat({
   messages: AgentMessage[]
   // Shows the typing indicator: a reply or a task is in progress
   typing: boolean
+  // What the agent is doing right now, shown beside the typing dots
+  activity?: string | null
+  // Opens the agent's live computer view
+  onWatch?: () => void
   // A request from the user is still in progress
   busy: boolean
   paused: boolean
@@ -218,6 +224,12 @@ export function AgentChat({
               {[0, 1, 2].map((i) => (
                 <span key={i} className="size-1.5 animate-bounce rounded-full bg-primary/70" style={{ animationDelay: `${i * 150}ms` }} />
               ))}
+              {activity && <span className="ml-2 max-w-64 truncate text-xs text-muted-foreground">{activity}</span>}
+              {onWatch && (
+                <button type="button" onClick={onWatch} className="ml-2 shrink-0 text-xs font-medium text-primary hover:underline">
+                  Watch live
+                </button>
+              )}
             </div>
           </div>
         )}

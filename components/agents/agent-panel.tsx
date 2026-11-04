@@ -150,6 +150,8 @@ export function AgentPanel({
             greeting={role.greeting}
             messages={workspace.messages[agentKey]}
             typing={workspace.typing.has(agentKey)}
+            activity={live?.key === "running" ? live.activity : null}
+            onWatch={hasComputer && !isMaster ? () => setTab("computer") : undefined}
             busy={workspace.busy.has(agentKey)}
             paused={isPaused}
             disabled={isMaster && ended}

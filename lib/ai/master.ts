@@ -252,7 +252,8 @@ export function normalizePlan(
     return {
       agentKey: task.agent as AgentKey,
       title: task.title,
-      instructions: task.instructions,
+      // The Scheduler turns "6 PM today" into a real time, so it needs the user's zone
+      instructions: task.agent === "scheduler" && !task.instructions.includes("time zone:") ? `${task.instructions}\n(The user's time zone: ${timeZone}.)` : task.instructions,
       position: i,
       dependsOn,
       scheduledAt: at,
@@ -298,7 +299,7 @@ export async function answerAgentQuestion({
 }) {
   const system = `${identity(campaignName)}
 The ${ROLES[task.agentKey].name} asked you a question while working on the task "${task.title}".
-Answer it yourself when the user's request, earlier answers, teammates' work or sound marketing judgment let you. Questions about metrics or follower numbers, time zones, audiences or posting habits always get an answer from you: tell the agent to use a sensible, typical assumption (no real data is available). Set "canAnswer" to false only if the work is impossible without a fact only the user has (for example a product's name, price or launch date), and then write a short, friendly "questionForUser".
+Answer it yourself when the user's request, earlier answers, teammates' work or sound marketing judgment let you. ${task.agentKey === "analytics" ? "The Analytics Agent has tools that read the user's real analytics: questions about metrics get the answer to look them up with those tools, and to say plainly when a number isn't available." : "Questions about metrics or follower numbers"}${task.agentKey === "analytics" ? " Questions about" : ","} time zones, audiences or posting habits always get an answer from you: tell the agent to use a sensible, typical assumption${task.agentKey === "analytics" ? "" : " (no real data is available)"}. Set "canAnswer" to false only if the work is impossible without a fact only the user has (for example a product's name, price or launch date), and then write a short, friendly "questionForUser".
 Reply with only a JSON object: {"canAnswer": true, "answer": "...", "questionForUser": ""}`
   const user = `User's request: ${request.prompt}\n\nTask instructions: ${task.instructions}${context ? `\n\n${context}` : ""}\n\nQuestion: ${question}`
   return completeJSON(answerSchema, [
@@ -319,6 +320,7 @@ export async function reviewOutput({
   task,
   output,
   evidence,
+  userRequest = null,
   signal,
 }: {
   campaignName: string
@@ -326,10 +328,25 @@ export async function reviewOutput({
   output: string
   // For agents with a computer: the pages it really opened and the files it made
   evidence?: string | null
+  // What the user asked for, in their words
+  userRequest?: string | null
   signal?: AbortSignal
 }) {
-  const computerCheck = evidence
-    ? ` This agent has its own computer; its log is included below. If the work claims fresh or current information (today's trends, news, a competitor's latest posts) but the log shows no pages were opened, reject it and ask the agent to check the web. Don't require browsing for work the agent can do well from its own knowledge (for example writing captions from a teammate's research), or when the instructions say not to use the browser.${
+  const analytics = task.agentKey === "analytics"
+  const computerCheck = task.agentKey === "scheduler"
+    ? evidence
+      ? " The Scheduler Agent can schedule drafts to publish; what is really scheduled is listed below. If the work says a post is scheduled or posted but the list doesn't show it, reject it. If the task asked to post or schedule and nothing is scheduled, reject it unless the work clearly explains why it couldn't (for example no account connected)."
+      : ""
+    : analytics
+    ? evidence
+      ? " The Analytics Agent reads the user's real synced analytics; the data it had is included below. Numbers in the work that match this data (or plausibly come from its tools for other periods) are real, not invented. Reject the work if it states numbers that contradict this data, or calls a metric zero when the data says it isn't reported."
+      : ""
+    : evidence
+    ? ` This agent has its own computer; its log is included below.${
+        task.agentKey === "research"
+          ? " If the research claims fresh or current information (today's trends, news, a competitor's latest posts) but the log shows no pages were opened, reject it and ask the agent to check the web, unless the user or the instructions said not to search."
+          : " Never reject the Creator Agent's work for not browsing: it writes and makes images from its own knowledge and its teammates' work, and it may mention popular hashtags without checking them."
+      }${
         task.agentKey === "creator"
           ? " The Creator Agent must save each post, caption or idea it delivers as a content draft: if the log shows no drafts were saved, reject it and ask it to save them with save_content_draft. If the instructions asked for images and the log shows none, ask for them."
           : task.agentKey === "research"
@@ -341,13 +358,13 @@ export async function reviewOutput({
     ? ` The instructions include details the user added after the task was assigned ("${USER_UPDATE_PREFIX}"); they take priority over earlier instructions. If the work ignores them, reject it and tell the agent exactly what to change.`
     : ""
   const system = `${identity(campaignName)}
-Review the work the ${ROLES[task.agentKey].name} delivered. Approve it if it completes the task instructions, stays in the agent's area and is usable. Reject it only for clear problems: it is off-task, misses a major part of the instructions, describes work instead of doing it, or invents performance data. When rejecting, give short, specific feedback the agent can act on.${updated}${computerCheck}
+Review the work the ${ROLES[task.agentKey].name} delivered. Approve it if it completes the task instructions, stays in the agent's area and is usable. The user's request overrides everything: never ask for something the user said not to do (for example searching the web). Reject it only for clear problems: it is off-task, misses a major part of the instructions, describes work instead of doing it, or invents performance data. When rejecting, give short, specific feedback the agent can act on.${updated}${computerCheck}
 Reply with only a JSON object: {"approved": true, "feedback": ""}`
   return completeJSON(reviewSchema, [
     { role: "system", content: system },
     {
       role: "user",
-      content: `Task: ${task.title}\nInstructions: ${task.instructions}\n\nDelivered work:\n${output}${evidence ? `\n\nComputer log:\n${evidence}` : ""}`,
+      content: `${userRequest ? `The user's request: ${userRequest}\n` : ""}Task: ${task.title}\nInstructions: ${task.instructions}\n\nDelivered work:\n${output}${evidence ? `\n\n${analytics ? "Analytics data" : task.agentKey === "scheduler" ? "Scheduled posts" : "Computer log"}:\n${evidence}` : ""}`,
     },
   ], { signal })
 }

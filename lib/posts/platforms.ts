@@ -10,8 +10,10 @@ export type PlatformInfo = {
   captionLimit: number
   hashtagLimit: number
   titleLimit: number | null
-  // Instagram can't publish a post without media
-  needsImage: boolean
+  // Instagram and TikTok can't publish without an image or video
+  needsMedia: boolean
+  // YouTube is video/Shorts only
+  videoOnly: boolean
   aspect: AspectRatio
   preset: PlatformPreset
   tone: string
@@ -24,7 +26,8 @@ export const PLATFORMS: Record<PostPlatform, PlatformInfo> = {
     captionLimit: 2200,
     hashtagLimit: 30,
     titleLimit: null,
-    needsImage: true,
+    needsMedia: true,
+    videoOnly: false,
     aspect: "4:5",
     preset: "instagram_portrait",
     tone: "bg-pink-500/12 text-pink-600 dark:text-pink-400",
@@ -35,7 +38,8 @@ export const PLATFORMS: Record<PostPlatform, PlatformInfo> = {
     captionLimit: 5000,
     hashtagLimit: 15,
     titleLimit: 100,
-    needsImage: false,
+    needsMedia: true,
+    videoOnly: true,
     aspect: "16:9",
     preset: "youtube_thumbnail",
     tone: "bg-red-500/12 text-red-600 dark:text-red-400",
@@ -46,7 +50,8 @@ export const PLATFORMS: Record<PostPlatform, PlatformInfo> = {
     captionLimit: 2200,
     hashtagLimit: 30,
     titleLimit: null,
-    needsImage: false,
+    needsMedia: true,
+    videoOnly: false,
     aspect: "9:16",
     preset: "tiktok",
     tone: "bg-zinc-900/10 text-zinc-900 dark:bg-white/10 dark:text-white",
@@ -64,4 +69,23 @@ export function parseHashtags(text: string) {
     if (tag && !seen.has(tag.toLowerCase())) seen.set(tag.toLowerCase(), `#${tag}`)
   }
   return [...seen.values()].slice(0, 40)
+}
+
+const VIDEO_EXT = /\.(mp4|mov|m4v|webm)(\?|#|$)/i
+export const isVideoUrl = (url: string) => VIDEO_EXT.test(url)
+
+/**
+ * The first reason this media can't go to these platforms, or null. A post has either up to 10
+ * images or a single video. Shared by the composer and the server.
+ */
+export function mediaIssue(platforms: readonly PostPlatform[], media: readonly { kind: "image" | "video" }[]) {
+  const videos = media.filter((m) => m.kind === "video").length
+  if (videos > 1) return "Add only one video per post."
+  if (videos === 1 && media.length > 1) return "A post can have images or one video, not both."
+  for (const p of platforms) {
+    const info = PLATFORMS[p]
+    if (info.videoOnly && videos === 0) return `${info.label} only takes videos (Shorts). Add a video or remove ${info.label}.`
+    if (info.needsMedia && media.length === 0) return `${info.label} posts need an image or a video.`
+  }
+  return null
 }

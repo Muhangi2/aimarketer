@@ -16,11 +16,13 @@ import {
   ImagePlus,
   Images,
   Pencil,
+  Plug,
   Save,
   Sparkles,
   Trash2,
   Type,
   Upload,
+  Video,
   X,
   type LucideIcon,
 } from "lucide-react"
@@ -41,8 +43,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/imagekit/edits"
 import type { Campaign } from "@/lib/campaign"
-import { generatePostImage, thumbUrl, uploadPostImage } from "@/lib/posts/client"
-import { PLATFORMS, POST_PLATFORMS, isPostPlatform, parseHashtags, type PostPlatform } from "@/lib/posts/platforms"
+import { encodeTarget, parseTarget, type PublishingAccount } from "@/lib/posts/targets"
+import { generatePostImage, thumbUrl, uploadPostMedia } from "@/lib/posts/client"
+import { PLATFORMS, POST_PLATFORMS, isPostPlatform, mediaIssue, parseHashtags, type PostPlatform } from "@/lib/posts/platforms"
 import { browserTimeZone, formatInZone, listTimeZones, utcToZonedParts, zoneLabel, zonedTimeToUtc } from "@/lib/posts/time"
 import type { PostMedia, PostRecord } from "@/lib/posts/types"
 
@@ -86,13 +89,25 @@ function Counter({ value, limit }: { value: number; limit: number }) {
   return <span className={cn("text-xs tabular-nums", value > limit ? "font-medium text-destructive" : "text-muted-foreground")}>{value.toLocaleString()}/{limit.toLocaleString()}</span>
 }
 
-// The form's starting values: an existing post's (when editing) or a fresh post's
-function initialValues(post: PostRecord | undefined) {
-  const platforms = (post?.platforms ?? []).filter(isPostPlatform)
+const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"]
+
+// The form's starting values: an existing post's (when editing) or a fresh post's. Only platforms
+// with a connected account can be picked.
+function initialValues(post: PostRecord | undefined, connected: PostPlatform[], accounts: PublishingAccount[]) {
+  const platforms = (post?.platforms ?? []).filter(isPostPlatform).filter((p) => connected.includes(p))
+  const targets: Partial<Record<PostPlatform, string>> = {}
+  for (const p of connected) {
+    const own = accounts.filter((a) => a.platform === p)
+    // Older posts saved a bare Blotato id
+    const saved = post?.targetAccounts[p]
+    const wanted = saved ? encodeTarget(parseTarget(saved).provider, parseTarget(saved).accountId) : null
+    targets[p] = (own.find((a) => a.id === wanted) ?? own[0]).id
+  }
   const schedule = post?.scheduledAt && post.timezone ? utcToZonedParts(post.scheduledAt, post.timezone) : null
   const [y, m, d] = schedule?.date.split("-").map(Number) ?? []
   return {
-    platforms: platforms.length ? platforms : (["instagram"] as PostPlatform[]),
+    platforms: platforms.length || post ? platforms : connected.slice(0, 1),
+    targets,
     title: post?.title ?? "",
     caption: post?.body ?? "",
     hashtags: post ? parseHashtags(post.hashtags.join(" ")) : [],
@@ -103,12 +118,26 @@ function initialValues(post: PostRecord | undefined) {
   }
 }
 
-export function PostComposer({ campaign, post }: { campaign: Campaign; post?: PostRecord }) {
+export function PostComposer({
+  campaign,
+  post,
+  accounts,
+  blotatoInvalid,
+}: {
+  campaign: Campaign
+  post?: PostRecord
+  // Accounts that can publish (Zernio's first, then Blotato's), ids "zernio:<id>" / "blotato:<id>"
+  accounts: PublishingAccount[]
+  blotatoInvalid: boolean
+}) {
   const router = useRouter()
-  const [initial] = useState(() => initialValues(post))
+  // The composer only offers platforms with a connected account
+  const connected = useMemo(() => POST_PLATFORMS.filter((p) => accounts.some((a) => a.platform === p)), [accounts])
+  const [initial] = useState(() => initialValues(post, connected, accounts))
   const isEdit = Boolean(post)
   const wasScheduled = post?.status === "scheduled" || post?.status === "pending"
   const [platforms, setPlatforms] = useState<PostPlatform[]>(initial.platforms)
+  const [targets, setTargets] = useState(initial.targets)
   const [title, setTitle] = useState(initial.title)
   const [caption, setCaption] = useState(initial.caption)
   const [hashtags, setHashtags] = useState<string[]>(initial.hashtags)
@@ -127,7 +156,7 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
   const [timezone, setTimezone] = useState(initial.timezone ?? "UTC")
   const [dateOpen, setDateOpen] = useState(false)
   const [zoneOpen, setZoneOpen] = useState(false)
-  const [previewPlatform, setPreviewPlatform] = useState<PostPlatform>(initial.platforms[0])
+  const [previewPlatform, setPreviewPlatform] = useState<PostPlatform>(initial.platforms[0] ?? connected[0] ?? "instagram")
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [intent, setIntent] = useState<"schedule" | "draft">("schedule")
@@ -159,15 +188,20 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
   // Everything that would stop the post from being scheduled
   const issues = useMemo(() => {
     const list: string[] = []
+    if (accounts.length === 0) list.push("Connect your social accounts on the Accounts page to schedule posts.")
+    if (blotatoInvalid && platforms.some((p) => targets[p]?.startsWith("blotato:"))) list.push("Blotato rejected your API key. Add a new one in Settings → Integrations, or pick another account.")
     if (platforms.length === 0) list.push("Pick at least one platform.")
     if (!title.trim()) list.push("Add a title.")
     if (caption.length > limits.caption) list.push(`Shorten the caption to ${limits.caption} characters.`)
     if (limits.title && title.length > limits.title) list.push(`Shorten the title to ${limits.title} characters for YouTube.`)
     if (allTags.length > limits.hashtags) list.push(`Use at most ${limits.hashtags} hashtags.`)
-    if (platforms.some((p) => PLATFORMS[p].needsImage) && media.length === 0) list.push("Instagram posts need at least one image.")
+    const mediaProblem = mediaIssue(platforms, media)
+    if (mediaProblem) list.push(mediaProblem)
     if (!scheduledAt || scheduledAt.getTime() < Date.now()) list.push("Pick a time in the future.")
     return list
-  }, [platforms, title, caption, limits, allTags, media, scheduledAt])
+  }, [accounts, blotatoInvalid, targets, platforms, title, caption, limits, allTags, media, scheduledAt])
+  // Problems that stop even a draft from saving
+  const draftIssue = useMemo(() => mediaIssue([], media), [media])
 
   function togglePlatform(p: PostPlatform) {
     setPlatforms((current) => (current.includes(p) ? current.filter((x) => x !== p) : [...current, p]))
@@ -184,15 +218,17 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
   }
 
   async function addFiles(files: FileList | File[]) {
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, MAX_MEDIA - media.length)
+    const list = Array.from(files)
+      .filter((f) => f.type.startsWith("image/") || VIDEO_TYPES.includes(f.type))
+      .slice(0, MAX_MEDIA - media.length)
     if (list.length === 0) return
     setMediaError(null)
     setUploading((n) => n + list.length)
     await Promise.all(
       list.map(async (file) => {
         try {
-          const { url } = await uploadPostImage(campaign.id, file)
-          setMedia((m) => [...m, { url, originalUrl: null, edits: [], origin: "upload" as const }].slice(0, MAX_MEDIA))
+          const { url, kind } = await uploadPostMedia(campaign.id, file)
+          setMedia((m) => [...m, { url, kind, originalUrl: null, edits: [], origin: "upload" as const }].slice(0, MAX_MEDIA))
         } catch (e) {
           setMediaError(e instanceof Error ? e.message : "Upload failed.")
         } finally {
@@ -208,7 +244,7 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
     setMediaError(null)
     try {
       const { url } = await generatePostImage(campaign.id, genPrompt.trim(), genAspect)
-      setMedia((m) => [...m, { url, originalUrl: null, edits: [], origin: "generated" as const }].slice(0, MAX_MEDIA))
+      setMedia((m) => [...m, { url, kind: "image" as const, originalUrl: null, edits: [], origin: "generated" as const }].slice(0, MAX_MEDIA))
     } catch (e) {
       setMediaError(e instanceof Error ? e.message : "Generation failed.")
     } finally {
@@ -216,24 +252,29 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
     }
   }
 
+  // Set once a new post is saved but its scheduling failed, so saving again updates that draft
+  const [savedId, setSavedId] = useState<string | null>(post?.id ?? null)
+
   function submit(kind: "schedule" | "draft") {
     setError(null)
     setIntent(kind)
     startTransition(async () => {
       const result = await savePost({
         campaignId: campaign.id,
-        postId: post?.id ?? null,
+        postId: savedId,
         intent: kind,
         title,
         caption,
         hashtags: allTags,
         platforms,
         media,
+        targetAccounts: Object.fromEntries(platforms.flatMap((p) => (targets[p] ? [[p, targets[p]]] : []))),
         date: format(date, "yyyy-MM-dd"),
         time,
         timezone,
       })
       if (!result.ok) {
+        if (result.post) setSavedId(result.post.id)
         setError(result.error)
         return
       }
@@ -277,9 +318,23 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
         {/* ---- Form ---- */}
         <div className="flex min-w-0 flex-col gap-6">
-          <Section step={1} title="Platforms" description="Where this post goes" Icon={Globe2} tone="bg-sky-500/12 text-sky-600 dark:text-sky-400">
+          <Section step={1} title="Platforms" description="Where this post goes: your accounts connected on Blotato" Icon={Globe2} tone="bg-sky-500/12 text-sky-600 dark:text-sky-400">
+            {connected.length === 0 && (
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-8 text-center">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500/12 text-sky-600 dark:text-sky-400">
+                  <Plug className="size-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium">Connect your social accounts first</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Connect Instagram, TikTok or YouTube on the Accounts page. It takes a minute and no other sign-up.</p>
+                </div>
+                <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/dashboard/accounts" />}>
+                  <Plug data-icon="inline-start" /> Go to Accounts
+                </Button>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
-              {POST_PLATFORMS.map((p) => {
+              {connected.map((p) => {
                 const info = PLATFORMS[p]
                 const on = platforms.includes(p)
                 return (
@@ -295,7 +350,13 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">{info.label}</span>
-                      <span className="block text-xs text-muted-foreground">{info.aspect} · {info.captionLimit.toLocaleString()} chars</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {(() => {
+                          const account = accounts.find((a) => a.id === targets[p])
+                          return account?.username ? `@${account.username.replace(/^@/, "")}` : (account?.fullname ?? info.aspect)
+                        })()}
+                        {info.videoOnly && " · video only"}
+                      </span>
                     </span>
                     <span className={cn("flex size-5 items-center justify-center rounded-full border transition-all", on ? "border-transparent bg-primary text-primary-foreground" : "bg-background")}>
                       {on && <Check className="size-3" />}
@@ -304,6 +365,27 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
                 )
               })}
             </div>
+            {/* Several accounts on one platform: pick which one posts */}
+            {platforms
+              .filter((p) => accounts.filter((a) => a.platform === p).length > 1)
+              .map((p) => (
+                <div key={p} className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor={`account-${p}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <PlatformIcon platform={p} className="size-3.5" /> Post to
+                  </Label>
+                  <NativeSelect id={`account-${p}`} size="sm" value={targets[p] ?? ""} onChange={(e) => setTargets((t) => ({ ...t, [p]: e.target.value }))}>
+                    {accounts
+                      .filter((a) => a.platform === p)
+                      .map((a) => (
+                        <NativeSelectOption key={a.id} value={a.id}>
+                          {a.fullname || a.username}
+                          {a.username ? ` (@${a.username.replace(/^@/, "")})` : ""}
+                          {a.provider === "blotato" ? " · via Blotato" : ""}
+                        </NativeSelectOption>
+                      ))}
+                  </NativeSelect>
+                </div>
+              ))}
           </Section>
 
           <Section step={2} title="Content" description="Title, caption and hashtags" Icon={Type} tone="bg-pink-500/12 text-pink-600 dark:text-pink-400">
@@ -355,7 +437,7 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
             </div>
           </Section>
 
-          <Section step={3} title="Media" description="Upload images or generate them with ImageKit AI, then edit" Icon={Images} tone="bg-violet-500/12 text-violet-600 dark:text-violet-400">
+          <Section step={3} title="Media" description="Upload images or a video, or generate images with ImageKit AI" Icon={Images} tone="bg-violet-500/12 text-violet-600 dark:text-violet-400">
             <div className="inline-flex w-fit rounded-lg bg-muted p-[3px]">
               {(
                 [
@@ -397,12 +479,12 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
                 <span className="flex size-11 items-center justify-center rounded-xl bg-violet-500/12 text-violet-600 dark:text-violet-400">
                   {uploading ? <Spinner className="size-5" /> : <ImagePlus className="size-5" />}
                 </span>
-                <span className="text-sm font-medium">{uploading ? `Uploading ${uploading} image${uploading === 1 ? "" : "s"}…` : "Drop images here or click to browse"}</span>
-                <span className="text-xs text-muted-foreground">JPG, PNG, WebP or GIF · up to 10 MB · max {MAX_MEDIA} images</span>
+                <span className="text-sm font-medium">{uploading ? `Uploading ${uploading} file${uploading === 1 ? "" : "s"}…` : "Drop images or a video here, or click to browse"}</span>
+                <span className="text-xs text-muted-foreground">Up to {MAX_MEDIA} images (JPG, PNG, WebP, GIF · 10 MB) or one video (MP4, MOV, WebM · 100 MB). YouTube needs a video.</span>
                 <input
                   ref={fileInput}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
                   multiple
                   hidden
                   onChange={(e) => {
@@ -445,8 +527,17 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                 {media.map((m, i) => (
                   <div key={m.url} className="group relative aspect-square overflow-hidden rounded-xl border bg-muted animate-in fade-in zoom-in-95">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={thumbUrl(m.url, 320)} alt={`Image ${i + 1}`} className="size-full object-cover" />
+                    {m.kind === "video" ? (
+                      <video src={m.url} className="size-full object-cover" muted playsInline preload="metadata" />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbUrl(m.url, 320)} alt={`Image ${i + 1}`} className="size-full object-cover" />
+                    )}
+                    {m.kind === "video" && (
+                      <span className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white sm:group-hover:opacity-0">
+                        <Video className="size-2.5" /> Video
+                      </span>
+                    )}
                     {i === 0 && <span className="absolute top-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">Cover</span>}
                     {m.edits.length > 0 && (
                       <span className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md bg-violet-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
@@ -454,10 +545,12 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
                       </span>
                     )}
                     <div className="absolute inset-x-0 bottom-0 flex justify-center gap-1.5 bg-linear-to-t from-black/70 to-transparent p-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                      <Button size="xs" variant="secondary" onClick={() => setEditing(i)}>
-                        <Pencil data-icon="inline-start" /> Edit image
-                      </Button>
-                      <Button size="icon-xs" variant="secondary" onClick={() => setMedia(media.filter((_, j) => j !== i))} aria-label="Remove image">
+                      {m.kind !== "video" && (
+                        <Button size="xs" variant="secondary" onClick={() => setEditing(i)}>
+                          <Pencil data-icon="inline-start" /> Edit image
+                        </Button>
+                      )}
+                      <Button size="icon-xs" variant="secondary" onClick={() => setMedia(media.filter((_, j) => j !== i))} aria-label={m.kind === "video" ? "Remove video" : "Remove image"}>
                         <Trash2 />
                       </Button>
                     </div>
@@ -550,7 +643,7 @@ export function PostComposer({ campaign, post }: { campaign: Campaign; post?: Po
               <p className={cn("text-xs", error ? "text-destructive" : "text-muted-foreground")}>{error ?? issues[0]}</p>
             )}
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button variant="outline" size="lg" disabled={pending || busyMedia || !title.trim() || platforms.length === 0} onClick={() => submit("draft")}>
+              <Button variant="outline" size="lg" disabled={pending || busyMedia || !title.trim() || platforms.length === 0 || Boolean(draftIssue)} onClick={() => submit("draft")}>
                 {pending && intent === "draft" ? <Spinner data-icon="inline-start" /> : <Save data-icon="inline-start" />}
                 {wasScheduled ? "Unschedule & save draft" : "Save draft"}
               </Button>

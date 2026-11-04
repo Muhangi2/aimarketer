@@ -183,24 +183,44 @@ export class OutputStore {
     return toFinding(data as Row)
   }
 
+  /**
+   * Saves a draft. The same title again in the same task (a retried step, or a revision) updates
+   * that draft instead of adding a copy.
+   */
   async addDraft(d: NewDraft) {
+    const platform = d.platform.trim().toLowerCase().slice(0, 40)
+    const title = d.title.trim().slice(0, 300)
+    const fields = {
+      platform,
+      // The Posts page schedules by platforms[]
+      platforms: [platform],
+      format: d.format,
+      title,
+      body: d.body.trim().slice(0, 12000),
+      hashtags: cleanHashtags(d.hashtags ?? []),
+      call_to_action: d.callToAction?.trim() || null,
+      image_urls: (d.imageUrls ?? []).slice(0, 20),
+      notes: d.notes?.trim() || null,
+    }
+    if (d.taskId) {
+      const { data: existing } = await this.db
+        .from("content_draft")
+        .select("id")
+        .eq("campaign_id", this.campaignId)
+        .eq("task_id", d.taskId)
+        .eq("title", title)
+        .eq("status", "draft")
+        .limit(1)
+        .maybeSingle()
+      if (existing) {
+        const { data, error } = await this.db.from("content_draft").update(fields).eq("id", (existing as Row).id).select(DRAFT_COLUMNS).single()
+        if (error) throw new StoreError("update content draft", error)
+        return toDraft(data as Row)
+      }
+    }
     const { data, error } = await this.db
       .from("content_draft")
-      .insert([
-        {
-          ...this.owner(),
-          request_id: d.requestId,
-          task_id: d.taskId,
-          platform: d.platform.trim().toLowerCase().slice(0, 40),
-          format: d.format,
-          title: d.title.trim().slice(0, 300),
-          body: d.body.trim().slice(0, 12000),
-          hashtags: cleanHashtags(d.hashtags ?? []),
-          call_to_action: d.callToAction?.trim() || null,
-          image_urls: (d.imageUrls ?? []).slice(0, 20),
-          notes: d.notes?.trim() || null,
-        },
-      ])
+      .insert([{ ...this.owner(), request_id: d.requestId, task_id: d.taskId, ...fields }])
       .select(DRAFT_COLUMNS)
       .single()
     if (error) throw new StoreError("save content draft", error)

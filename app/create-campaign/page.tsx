@@ -32,7 +32,7 @@ export default async function CreateCampaignPage({
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
           {hasCampaign ? (
-            <Button variant="ghost" size="sm" render={<Link href="/dashboard" />}>
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/dashboard" />}>
               <ArrowLeft /> Back to dashboard
             </Button>
           ) : (

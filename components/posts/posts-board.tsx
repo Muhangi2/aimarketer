@@ -6,7 +6,9 @@ import { formatDistanceToNow } from "date-fns"
 import {
   Bot,
   CalendarClock,
+  AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   FileText,
   ImageIcon,
   Layers,
@@ -45,6 +47,7 @@ const STATUS_STYLE: Record<PostStatus, { label: string; className: string }> = {
   approved: { label: "Approved", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300" },
   pending: { label: "Pending", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   scheduled: { label: "Scheduled", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  publishing: { label: "Publishing…", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300" },
   published: { label: "Published", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
   failed: { label: "Failed", className: "bg-destructive/10 text-destructive" },
   archived: { label: "Archived", className: "bg-muted text-muted-foreground" },
@@ -62,7 +65,7 @@ const inTab = (post: PostRecord, tab: Tab) =>
   tab === "all"
     ? post.status !== "archived"
     : tab === "scheduled"
-      ? post.status === "scheduled" || post.status === "pending"
+      ? post.status === "scheduled" || post.status === "pending" || post.status === "publishing"
       : tab === "drafts"
         ? post.status === "draft" || post.status === "approved"
         : post.status === "published"
@@ -167,6 +170,34 @@ function PostCard({ post, highlighted, onDelete, index }: { post: PostRecord; hi
         {post.body && <p className="line-clamp-2 text-xs text-muted-foreground">{post.body}</p>}
         {post.hashtags.length > 0 && (
           <p className="truncate text-xs text-sky-700 dark:text-sky-400">{post.hashtags.slice(0, 5).join(" ")}</p>
+        )}
+        {post.status === "scheduled" && post.publishResults.some((r) => r.status === "scheduled") && (
+          <p className="inline-flex w-fit items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300" title="Zernio holds this post and publishes it at the scheduled time.">
+            <CheckCircle2 className="size-3" /> Booked on Zernio
+          </p>
+        )}
+        {(post.status === "published" || post.status === "failed") && post.publishResults.some((r) => r.publicUrl) && (
+          <div className="flex flex-wrap gap-1.5">
+            {post.publishResults
+              .filter((r) => r.publicUrl)
+              .map((r) => (
+                <a
+                  key={r.platform}
+                  href={r.publicUrl!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                >
+                  <PlatformIcon platform={r.platform} className="size-3" /> View <ExternalLink className="size-2.5" />
+                </a>
+              ))}
+          </div>
+        )}
+        {(post.status === "published" || post.status === "failed") && post.publishError && (
+          <p className="flex items-start gap-1.5 rounded-md bg-destructive/8 px-2 py-1.5 text-[11px] whitespace-pre-line text-destructive" title={post.publishError}>
+            <AlertTriangle className="mt-px size-3 shrink-0" />
+            <span className="line-clamp-3">{post.publishError}</span>
+          </p>
         )}
         <div className="mt-auto flex items-center gap-2 border-t pt-3">
           <div className="flex -space-x-1">

@@ -17,7 +17,7 @@ import {
   ThumbsUp,
 } from "lucide-react"
 import { cn } from "cn"
-import type { PostPlatform } from "@/lib/posts/platforms"
+import { isVideoUrl, type PostPlatform } from "@/lib/posts/platforms"
 
 export type PreviewData = {
   title: string
@@ -30,11 +30,18 @@ export type PreviewData = {
 
 const handle = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "your_brand"
 
+// Images as pictures, videos playing silently on a loop like the feeds do
+function MediaView({ url, className }: { url: string; className?: string }) {
+  if (isVideoUrl(url)) return <video src={url} className={className} autoPlay muted loop playsInline />
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="" className={className} />
+}
+
 function EmptyMedia({ className, dark }: { className?: string; dark?: boolean }) {
   return (
     <div className={cn("flex flex-col items-center justify-center gap-2 text-xs", dark ? "bg-zinc-800 text-zinc-400" : "bg-muted text-muted-foreground", className)}>
       <ImageIcon className="size-8 opacity-60" />
-      Your image appears here
+      Your image or video appears here
     </div>
   )
 }
@@ -77,8 +84,7 @@ function InstagramPreview({ data }: { data: PreviewData }) {
       </div>
       <div className="relative aspect-4/5 bg-zinc-100 dark:bg-zinc-900">
         {data.images.length ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={data.images[index]} src={data.images[index]} alt="" className="size-full object-cover animate-in fade-in duration-300" />
+          <MediaView key={data.images[index]} url={data.images[index]} className="size-full object-cover animate-in fade-in duration-300" />
         ) : (
           <EmptyMedia className="size-full" />
         )}
@@ -136,8 +142,7 @@ function TikTokPreview({ data }: { data: PreviewData }) {
     <div className="mx-auto w-full max-w-[300px] rounded-[2.2rem] border-[6px] border-zinc-900 bg-black shadow-2xl shadow-black/20">
       <div className="relative aspect-9/16 overflow-hidden rounded-[1.75rem] text-white">
         {data.images[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={data.images[0]} src={data.images[0]} alt="" className="absolute inset-0 size-full object-cover animate-in fade-in duration-300" />
+          <MediaView key={data.images[0]} url={data.images[0]} className="absolute inset-0 size-full object-cover animate-in fade-in duration-300" />
         ) : (
           <EmptyMedia dark className="absolute inset-0" />
         )}
@@ -189,8 +194,7 @@ function YouTubePreview({ data }: { data: PreviewData }) {
     <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border bg-white text-zinc-900 shadow-xl shadow-black/5 dark:border-zinc-800 dark:bg-[#0f0f0f] dark:text-zinc-50">
       <div className="relative aspect-video bg-zinc-100 dark:bg-zinc-900">
         {data.images[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={data.images[0]} src={data.images[0]} alt="" className="size-full object-cover animate-in fade-in duration-300" />
+          <MediaView key={data.images[0]} url={data.images[0]} className="size-full object-cover animate-in fade-in duration-300" />
         ) : (
           <EmptyMedia className="size-full" />
         )}
