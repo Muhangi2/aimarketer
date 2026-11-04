@@ -44,10 +44,10 @@ import { isEditablePost, type PostRecord, type PostStatus } from "@/lib/posts/ty
 
 const STATUS_STYLE: Record<PostStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-500/12 text-slate-700 dark:text-slate-300" },
-  approved: { label: "Approved", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300" },
+  approved: { label: "Approved", className: "bg-brand/12 text-brand-deep dark:text-brand-glow" },
   pending: { label: "Pending", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   scheduled: { label: "Scheduled", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  publishing: { label: "Publishing…", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300" },
+  publishing: { label: "Publishing…", className: "bg-brand/12 text-brand-deep dark:text-brand-glow" },
   published: { label: "Published", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
   failed: { label: "Failed", className: "bg-destructive/10 text-destructive" },
   archived: { label: "Archived", className: "bg-muted text-muted-foreground" },
@@ -110,7 +110,7 @@ function PostCard({ post, highlighted, onDelete, index }: { post: PostRecord; hi
           // eslint-disable-next-line @next/next/no-img-element
           <img src={thumbUrl(cover)} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
         ) : (
-          <div className="flex size-full flex-col items-center justify-center gap-2 bg-linear-to-br from-pink-500/10 via-violet-500/10 to-sky-500/10 p-6 text-center">
+          <div className="flex size-full flex-col items-center justify-center gap-2 bg-linear-to-br from-brand/10 via-brand/10 to-brand/10 p-6 text-center">
             <FileText className="size-7 text-muted-foreground/70" />
             <p className="line-clamp-3 text-xs text-muted-foreground">{post.body || post.title}</p>
           </div>
@@ -118,7 +118,7 @@ function PostCard({ post, highlighted, onDelete, index }: { post: PostRecord; hi
         <span
           className={cn(
             "absolute top-2.5 left-2.5 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shadow-sm backdrop-blur",
-            post.source === "agent" ? "bg-violet-600/90 text-white" : "bg-background/90 text-foreground"
+            post.source === "agent" ? "bg-brand/90 text-white" : "bg-background/90 text-foreground"
           )}
         >
           {post.source === "agent" ? <Sparkles className="size-3" /> : <PenLine className="size-3" />}
@@ -169,7 +169,7 @@ function PostCard({ post, highlighted, onDelete, index }: { post: PostRecord; hi
         </div>
         {post.body && <p className="line-clamp-2 text-xs text-muted-foreground">{post.body}</p>}
         {post.hashtags.length > 0 && (
-          <p className="truncate text-xs text-sky-700 dark:text-sky-400">{post.hashtags.slice(0, 5).join(" ")}</p>
+          <p className="truncate text-xs text-brand-deep dark:text-brand-glow">{post.hashtags.slice(0, 5).join(" ")}</p>
         )}
         {post.status === "scheduled" && post.publishResults.some((r) => r.status === "scheduled") && (
           <p className="inline-flex w-fit items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300" title="Zernio holds this post and publishes it at the scheduled time.">
@@ -276,10 +276,10 @@ export function PostsBoard({ posts, highlightId }: { posts: PostRecord[]; highli
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Total posts" value={counts.total} Icon={FileText} tone="bg-pink-500/12 text-pink-600 dark:text-pink-400" />
+        <Stat label="Total posts" value={counts.total} Icon={FileText} tone="bg-brand/12 text-brand dark:text-brand-glow" />
         <Stat label="Scheduled" value={counts.scheduled} Icon={CalendarClock} tone="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
-        <Stat label="Drafts" value={counts.drafts} Icon={CheckCircle2} tone="bg-sky-500/12 text-sky-600 dark:text-sky-400" />
-        <Stat label="AI-generated" value={counts.ai} Icon={Bot} tone="bg-violet-500/12 text-violet-600 dark:text-violet-400" />
+        <Stat label="Drafts" value={counts.drafts} Icon={CheckCircle2} tone="bg-brand/12 text-brand dark:text-brand-glow" />
+        <Stat label="AI-generated" value={counts.ai} Icon={Bot} tone="bg-brand/12 text-brand dark:text-brand-glow" />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -325,8 +325,8 @@ export function PostsBoard({ posts, highlightId }: { posts: PostRecord[]; highli
       {visible.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed bg-card/50 px-6 py-16 text-center animate-in fade-in">
           <div className="relative">
-            <span className="absolute inset-0 scale-150 rounded-full bg-pink-500/12 opacity-40 blur-xl" />
-            <span className="relative flex size-14 items-center justify-center rounded-2xl bg-pink-500/12 text-pink-600 ring-8 ring-muted/60 dark:text-pink-400">
+            <span className="absolute inset-0 scale-150 rounded-full bg-brand/12 opacity-40 blur-xl" />
+            <span className="relative flex size-14 items-center justify-center rounded-2xl bg-brand/12 text-brand ring-8 ring-muted/60 dark:text-brand-glow">
               <ImageIcon className="size-6" />
             </span>
           </div>

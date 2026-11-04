@@ -10,8 +10,8 @@ import { AgentAvatar } from "@/components/agents/agent-avatar"
 import { TaskItem } from "@/components/agents/agent-history"
 
 const REQUEST_STATUS: Record<RequestStatus, { label: string; className: string }> = {
-  planning: { label: "Planning…", className: "bg-violet-500/12 text-violet-700 dark:text-violet-300" },
-  running: { label: "In progress", className: "bg-blue-500/12 text-blue-700 dark:text-blue-300" },
+  planning: { label: "Planning…", className: "bg-brand/12 text-brand-deep dark:text-brand-glow" },
+  running: { label: "In progress", className: "bg-brand/12 text-brand-deep dark:text-brand-glow" },
   awaiting_clarification: { label: "Needs your input", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   waiting: { label: "On hold", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   completed: { label: "Completed", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400" },
@@ -41,7 +41,7 @@ export function MasterTasks({
   if (requests.length === 0) {
     return (
       <div className="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-300">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-violet-500/12 text-violet-600 ring-8 ring-muted/60 dark:text-violet-400">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-brand/12 text-brand ring-8 ring-muted/60 dark:text-brand-glow">
           <Workflow className="size-6" />
         </span>
         <p className="mt-6 text-sm font-semibold">No requests yet</p>
@@ -75,7 +75,7 @@ export function MasterTasks({
             {own.length > 0 && (
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={done} aria-valuemax={own.length}>
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-500 transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-brand to-brand transition-all duration-500"
                   style={{ width: `${(done / own.length) * 100}%` }}
                 />
               </div>

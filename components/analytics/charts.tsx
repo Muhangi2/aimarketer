@@ -33,7 +33,7 @@ export function TrendChart({ report, hasMetrics }: { report: AnalyticsReport; ha
       title="Views & engagement"
       description={`Lifetime ${label.toLowerCase()} of posts, by the ${report.granularity} they were published`}
       Icon={LineChart}
-      tone="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+      tone="bg-brand/12 text-brand dark:text-brand-glow"
       action={<Segmented label="Metric" value={metric} onChange={setMetric} options={TREND_METRICS.map((m) => ({ key: m.key, label: m.label }))} />}
     >
       {!anyData || !reported ? (
@@ -107,7 +107,7 @@ export function ActivityChart({ report }: { report: AnalyticsReport }) {
       title={report.granularity === "day" ? "Daily posting activity" : "Weekly posting activity"}
       description="Platform posts the app sent out, and any that failed"
       Icon={BarChart3}
-      tone="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+      tone="bg-brand/12 text-brand dark:text-brand-glow"
       action={
         any && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">

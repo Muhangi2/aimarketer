@@ -318,10 +318,10 @@ export function PostComposer({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
         {/* ---- Form ---- */}
         <div className="flex min-w-0 flex-col gap-6">
-          <Section step={1} title="Platforms" description="Where this post goes: your accounts connected on Blotato" Icon={Globe2} tone="bg-sky-500/12 text-sky-600 dark:text-sky-400">
+          <Section step={1} title="Platforms" description="Where this post goes: your accounts connected on Blotato" Icon={Globe2} tone="bg-brand/12 text-brand dark:text-brand-glow">
             {connected.length === 0 && (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-8 text-center">
-                <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500/12 text-sky-600 dark:text-sky-400">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-brand/12 text-brand dark:text-brand-glow">
                   <Plug className="size-5" />
                 </span>
                 <div>
@@ -388,7 +388,7 @@ export function PostComposer({
               ))}
           </Section>
 
-          <Section step={2} title="Content" description="Title, caption and hashtags" Icon={Type} tone="bg-pink-500/12 text-pink-600 dark:text-pink-400">
+          <Section step={2} title="Content" description="Title, caption and hashtags" Icon={Type} tone="bg-brand/12 text-brand dark:text-brand-glow">
             <div className="grid gap-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="post-title">Title</Label>
@@ -410,9 +410,9 @@ export function PostComposer({
               </div>
               <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-input px-2 py-1.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
                 {hashtags.map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 py-0.5 pr-1 pl-2 text-xs font-medium text-sky-700 animate-in zoom-in-95 dark:text-sky-300">
+                  <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-brand/10 py-0.5 pr-1 pl-2 text-xs font-medium text-brand-deep animate-in zoom-in-95 dark:text-brand-glow">
                     {tag}
-                    <button type="button" onClick={() => setHashtags(hashtags.filter((t) => t !== tag))} className="rounded p-0.5 hover:bg-sky-500/20" aria-label={`Remove ${tag}`}>
+                    <button type="button" onClick={() => setHashtags(hashtags.filter((t) => t !== tag))} className="rounded p-0.5 hover:bg-brand/20" aria-label={`Remove ${tag}`}>
                       <X className="size-3" />
                     </button>
                   </span>
@@ -437,7 +437,7 @@ export function PostComposer({
             </div>
           </Section>
 
-          <Section step={3} title="Media" description="Upload images or a video, or generate images with ImageKit AI" Icon={Images} tone="bg-violet-500/12 text-violet-600 dark:text-violet-400">
+          <Section step={3} title="Media" description="Upload images or a video, or generate images with ImageKit AI" Icon={Images} tone="bg-brand/12 text-brand dark:text-brand-glow">
             <div className="inline-flex w-fit rounded-lg bg-muted p-[3px]">
               {(
                 [
@@ -472,11 +472,11 @@ export function PostComposer({
                 }}
                 disabled={media.length >= MAX_MEDIA}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-all hover:border-violet-500/50 hover:bg-violet-500/5 disabled:opacity-50",
-                  dragging && "border-violet-500 bg-violet-500/8"
+                  "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-all hover:border-brand/50 hover:bg-brand/5 disabled:opacity-50",
+                  dragging && "border-brand bg-brand/8"
                 )}
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-brand/12 text-brand dark:text-brand-glow">
                   {uploading ? <Spinner className="size-5" /> : <ImagePlus className="size-5" />}
                 </span>
                 <span className="text-sm font-medium">{uploading ? `Uploading ${uploading} file${uploading === 1 ? "" : "s"}…` : "Drop images or a video here, or click to browse"}</span>
@@ -494,7 +494,7 @@ export function PostComposer({
                 />
               </button>
             ) : (
-              <div className="flex flex-col gap-3 rounded-xl border bg-linear-to-br from-violet-500/5 to-pink-500/5 p-4">
+              <div className="flex flex-col gap-3 rounded-xl border bg-linear-to-br from-brand/5 to-brand/5 p-4">
                 <Textarea
                   value={genPrompt}
                   onChange={(e) => setGenPrompt(e.target.value)}
@@ -513,7 +513,7 @@ export function PostComposer({
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
-                  <Button onClick={generate} disabled={generating || genPrompt.trim().length < 3 || media.length >= MAX_MEDIA} className="ml-auto bg-violet-600 text-white hover:bg-violet-600/90">
+                  <Button onClick={generate} disabled={generating || genPrompt.trim().length < 3 || media.length >= MAX_MEDIA} className="ml-auto bg-brand text-white hover:bg-brand/90">
                     {generating ? <Spinner data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
                     {generating ? "Generating…" : "Generate image"}
                   </Button>
@@ -540,7 +540,7 @@ export function PostComposer({
                     )}
                     {i === 0 && <span className="absolute top-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">Cover</span>}
                     {m.edits.length > 0 && (
-                      <span className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md bg-violet-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-medium text-white">
                         <Sparkles className="size-2.5" /> Edited
                       </span>
                     )}
@@ -558,7 +558,7 @@ export function PostComposer({
                 ))}
                 {busyMedia && (
                   <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-muted/50 text-xs text-muted-foreground">
-                    <Spinner className="size-5 text-violet-600" />
+                    <Spinner className="size-5 text-brand" />
                     {generating ? "Generating…" : "Uploading…"}
                   </div>
                 )}

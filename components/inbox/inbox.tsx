@@ -508,7 +508,7 @@ export function Inbox({ campaignId, connected, configured }: { campaignId: strin
 
       {!connected ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed px-6 py-16 text-center">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/30">
             <InboxIcon className="size-6" />
           </span>
           <h3 className="mt-5 text-lg font-semibold">Connect an account to see your inbox</h3>

@@ -76,7 +76,7 @@ export function AgentPanel({
     <section
       className={cn(
         "flex min-h-0 flex-col rounded-2xl border bg-card px-5 pt-5 pb-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300",
-        isMaster && "border-violet-500/30 shadow-violet-500/10 ring-1 ring-violet-500/15",
+        isMaster && "border-brand/30 shadow-brand/10 ring-1 ring-brand/15",
         className
       )}
     >

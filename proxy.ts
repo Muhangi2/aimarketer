@@ -19,7 +19,8 @@ export async function proxy(request: NextRequest) {
   if (isProtected && !accessToken) {
     return redirectWithCookies(request, response, "/sign-in")
   }
-  if (isAuthPage && accessToken) {
+  // Signed-in users skip the landing page
+  if ((isAuthPage || pathname === "/") && accessToken) {
     return redirectWithCookies(request, response, "/dashboard")
   }
 

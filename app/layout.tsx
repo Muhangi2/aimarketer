@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
 const appFont = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -8,8 +8,11 @@ const appFont = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+// Small monospace labels (badges, tags, captions)
+const monoFont = Geist_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+
 export const metadata: Metadata = {
-  title: "AI Marketer",
+  title: "Hively",
   description: "Plan, create and grow your social media campaigns with AI agents.",
 };
 
@@ -19,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={appFont.variable}>
+    <html lang="en" className={`${appFont.variable} ${monoFont.variable}`}>
       <body style={{ margin: 0, padding: 0 }}>
         {children}
       </body>

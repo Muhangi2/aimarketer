@@ -15,10 +15,10 @@ export type LiveStatus = {
 }
 
 export const LIVE_STATUS_STYLE: Record<LiveStatusKey, { badge: string; dot: string }> = {
-  running: { badge: "bg-blue-500/12 text-blue-700 dark:text-blue-300", dot: "bg-blue-500 animate-pulse" },
-  scheduled: { badge: "bg-sky-500/12 text-sky-700 dark:text-sky-300", dot: "bg-sky-500" },
+  running: { badge: "bg-brand/12 text-brand-deep dark:text-brand-glow", dot: "bg-brand animate-pulse" },
+  scheduled: { badge: "bg-muted text-foreground/70", dot: "bg-brand-glow" },
   waiting: { badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500 animate-pulse" },
-  in_control: { badge: "bg-violet-500/12 text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
+  in_control: { badge: "bg-brand text-white", dot: "bg-brand-deep" },
   paused: { badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
   done: { badge: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
   skipped: { badge: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/60" },

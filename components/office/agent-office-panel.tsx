@@ -25,7 +25,7 @@ export function AgentOfficePanel({
   return (
     <section className={cn("flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm", className)}>
       <header className="flex shrink-0 items-center gap-3 border-b px-5 py-4">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand/12 text-brand dark:text-brand-glow">
           <Bot className="size-4" />
         </span>
         <div className="min-w-0 flex-1">

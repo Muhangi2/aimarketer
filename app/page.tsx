@@ -1,6 +1,8 @@
-import { redirect } from "next/navigation"
+import { getOfficeScene } from "@/lib/office-scene"
+import { LandingPage } from "@/components/landing/landing-page"
 
-// The proxy sends signed-out visitors on to /sign-in
-export default function Home() {
-  redirect("/dashboard")
+// Public landing page. The proxy sends signed-in users straight to /dashboard
+export default async function Home() {
+  const scene = await getOfficeScene("/offices/office-warm.png")
+  return <LandingPage scene={scene} />
 }

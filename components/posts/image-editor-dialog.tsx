@@ -148,7 +148,7 @@ export function ImageEditorDialog({
       <DialogContent className="max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto p-0 sm:max-w-5xl">
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-brand/12 text-brand dark:text-brand-glow">
               <Sparkles className="size-4" />
             </span>
             Edit image
@@ -166,7 +166,7 @@ export function ImageEditorDialog({
               )}
               {busy && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/70 backdrop-blur-sm animate-in fade-in">
-                  <Spinner className="size-6 text-violet-600" />
+                  <Spinner className="size-6 text-brand" />
                   <p className="text-sm font-medium">Applying {info.label.toLowerCase()}…</p>
                   <p className="max-w-xs text-center text-xs text-muted-foreground">AI edits can take up to a minute the first time.</p>
                 </div>
@@ -183,7 +183,7 @@ export function ImageEditorDialog({
                     title={v.operation ? EDIT_CATALOG[v.operation].label : "Original"}
                     className={cn(
                       "relative size-14 shrink-0 overflow-hidden rounded-lg border-2 bg-background transition-all",
-                      i === index ? "border-violet-500 ring-3 ring-violet-500/20" : "border-transparent opacity-70 hover:opacity-100"
+                      i === index ? "border-brand ring-3 ring-brand/20" : "border-transparent opacity-70 hover:opacity-100"
                     )}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -222,7 +222,7 @@ export function ImageEditorDialog({
                         onClick={() => setOperation(op)}
                         className={cn(
                           "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-medium transition-all hover:bg-muted",
-                          operation === op && "border-violet-500/50 bg-violet-500/8 text-violet-700 ring-3 ring-violet-500/10 dark:text-violet-300"
+                          operation === op && "border-brand/50 bg-brand/8 text-brand-deep ring-3 ring-brand/10 dark:text-brand-glow"
                         )}
                       >
                         <Icon className="size-3.5 shrink-0" />
@@ -284,7 +284,7 @@ export function ImageEditorDialog({
                   </div>
                 </div>
               )}
-              <Button onClick={apply} disabled={busy || !available || missing || !current} className="bg-violet-600 text-white hover:bg-violet-600/90">
+              <Button onClick={apply} disabled={busy || !available || missing || !current} className="bg-brand text-white hover:bg-brand/90">
                 {busy ? <Spinner data-icon="inline-start" /> : <Wand2 data-icon="inline-start" />}
                 Apply {info.label.toLowerCase()}
               </Button>

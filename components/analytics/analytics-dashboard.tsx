@@ -33,7 +33,7 @@ function Notice({ tone, Icon, children, action }: { tone: "info" | "warn" | "err
     <div
       className={cn(
         "flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-sm animate-in fade-in duration-300",
-        tone === "info" && "border-blue-500/20 bg-blue-500/6 text-blue-900 dark:text-blue-200",
+        tone === "info" && "border-brand/20 bg-brand/6 text-brand-deep dark:text-brand-glow",
         tone === "warn" && "border-amber-500/25 bg-amber-500/8 text-amber-900 dark:text-amber-200",
         tone === "error" && "border-destructive/25 bg-destructive/8 text-destructive"
       )}

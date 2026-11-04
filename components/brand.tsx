@@ -12,7 +12,7 @@ export function Brand({ className, inverted = false }: { className?: string; inv
       >
         <Sparkles className="size-4" />
       </span>
-      <span className="text-[15px]">AI Marketer</span>
+      <span className="text-[15px]">Hively</span>
     </span>
   )
 }

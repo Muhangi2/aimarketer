@@ -18,9 +18,9 @@ const RUN_STATUS: Record<TaskRunRecord["status"], string> = {
 
 export const TASK_STATUS: Record<TaskStatus, { label: string; className: string; dot: string }> = {
   pending: { label: "Scheduled", className: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
-  queued: { label: "Starting…", className: "bg-sky-500/12 text-sky-700 dark:text-sky-300", dot: "bg-sky-500 animate-pulse" },
-  in_progress: { label: "Working…", className: "bg-blue-500/12 text-blue-700 dark:text-blue-300", dot: "bg-blue-500 animate-pulse" },
-  in_review: { label: "In review", className: "bg-violet-500/12 text-violet-700 dark:text-violet-300", dot: "bg-violet-500 animate-pulse" },
+  queued: { label: "Starting…", className: "bg-brand/12 text-brand-deep dark:text-brand-glow", dot: "bg-brand animate-pulse" },
+  in_progress: { label: "Working…", className: "bg-brand/12 text-brand-deep dark:text-brand-glow", dot: "bg-brand animate-pulse" },
+  in_review: { label: "In review", className: "bg-brand/12 text-brand-deep dark:text-brand-glow", dot: "bg-brand animate-pulse" },
   needs_input: { label: "Needs your input", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
   waiting_for_user: { label: "Waiting for you", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500 animate-pulse" },
   completed: { label: "Done", className: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
@@ -80,7 +80,7 @@ export function TaskItem({
                 <span>{formatDistanceToNow(task.updatedAt || task.createdAt, { addSuffix: true })}</span>
               )}
               {task.repeatRule && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-1.5 py-px text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-medium text-brand-deep dark:text-brand-glow">
                   <Repeat className="size-2.5" /> {describeRepeat(task.repeatRule)}
                   {task.runCount > 0 && ` · ran ${task.runCount}×`}
                 </span>
@@ -170,7 +170,7 @@ export function AgentHistory({
   if (tasks.length === 0) {
     return (
       <div className="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-300">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-violet-500/12 text-violet-600 ring-8 ring-muted/60 dark:text-violet-400">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-brand/12 text-brand ring-8 ring-muted/60 dark:text-brand-glow">
           <ClipboardList className="size-6" />
         </span>
         <p className="mt-6 text-sm font-semibold">No tasks yet</p>
