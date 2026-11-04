@@ -1,6 +1,6 @@
 import "server-only"
 import OpenAI from "openai"
-import { fetchWhenReady, generatedImageUrl, imageKitConfigured } from "@/lib/computers/imagekit"
+import { fetchWhenReady, generatedImageUrl, imageKitConfigured, transformedUrl } from "@/lib/computers/imagekit"
 
 /*
  * Image generation for the Creator Agent. IMAGE_PROVIDER picks the first provider to try
@@ -33,9 +33,9 @@ function configured(provider: ImageProvider) {
   return imageKitConfigured()
 }
 
-/** Providers to try, in order. */
-export function providerOrder(): ImageProvider[] {
-  const preferred = process.env.IMAGE_PROVIDER?.toLowerCase() as ImageProvider | undefined
+/** Providers to try, in order: `prefer` first (else IMAGE_PROVIDER, else gemini), then the rest. */
+export function providerOrder(prefer?: ImageProvider): ImageProvider[] {
+  const preferred = prefer ?? (process.env.IMAGE_PROVIDER?.toLowerCase() as ImageProvider | undefined)
   const first = preferred && PROVIDERS.includes(preferred) ? preferred : "gemini"
   return [first, ...PROVIDERS.filter((p) => p !== first)].filter(configured)
 }
@@ -88,14 +88,24 @@ async function withOpenAI(prompt: string, aspect: AspectRatio): Promise<Generate
   return { bytes: Buffer.from(b64, "base64"), mimeType: "image/png", provider: "openai" }
 }
 
-async function withImageKit(prompt: string): Promise<GeneratedImage> {
-  const image = await fetchWhenReady(generatedImageUrl(prompt, `generated-${Date.now()}`))
+// ImageKit AI always makes a square image; other ratios are smart-cropped in the same request
+const IMAGEKIT_CROP: Record<AspectRatio, string | null> = {
+  "1:1": null,
+  "4:5": "w-1080,h-1350,fo-auto",
+  "9:16": "w-1080,h-1920,fo-auto",
+  "16:9": "w-1920,h-1080,fo-auto",
+}
+
+async function withImageKit(prompt: string, aspect: AspectRatio): Promise<GeneratedImage> {
+  const url = generatedImageUrl(prompt, `generated-${Date.now()}`)
+  const crop = IMAGEKIT_CROP[aspect]
+  const image = await fetchWhenReady(crop ? transformedUrl(url, crop) : url)
   return { ...image, provider: "imagekit" }
 }
 
-/** Generates an image with the first provider that works. */
-export async function generateImage(prompt: string, aspect: AspectRatio = "1:1"): Promise<GeneratedImage> {
-  const order = providerOrder()
+/** Generates an image with the first provider that works (`prefer` is tried first). */
+export async function generateImage(prompt: string, aspect: AspectRatio = "1:1", prefer?: ImageProvider): Promise<GeneratedImage> {
+  const order = providerOrder(prefer)
   if (order.length === 0) throw new Error("No image provider is set up (GEMINI_API_KEY, CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, OPENAI_API_KEY or ImageKit).")
   const problems: string[] = []
   for (const provider of order) {
@@ -103,7 +113,7 @@ export async function generateImage(prompt: string, aspect: AspectRatio = "1:1")
       if (provider === "gemini") return await withGemini(prompt, aspect)
       if (provider === "cloudflare") return await withCloudflare(prompt, aspect)
       if (provider === "openai") return await withOpenAI(prompt, aspect)
-      return await withImageKit(prompt)
+      return await withImageKit(prompt, aspect)
     } catch (error) {
       problems.push(`${provider}: ${error instanceof Error ? error.message : String(error)}`)
     }

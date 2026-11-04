@@ -1,5 +1,6 @@
 import "server-only"
 import { getInsForgeAdmin } from "@/lib/insforge/admin"
+import { PLATFORM_SIZES, type ImageEdit } from "@/lib/imagekit/edits"
 
 /*
  * ImageKit: permanent URLs for files agents make, and ImageKit AI image edits.
@@ -112,31 +113,7 @@ function promptParam(text: string) {
   return encodeURIComponent(text.replace(/[,:/\\?&#]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300))
 }
 
-export type ImageEdit =
-  | { operation: "remove_background" }
-  | { operation: "change_background"; prompt: string }
-  | { operation: "edit"; prompt: string }
-  | { operation: "upscale" }
-  | { operation: "extend"; width: number; height: number; prompt?: string | null }
-  | { operation: "smart_crop"; width: number; height: number }
-  | { operation: "add_text"; text: string; position: TextPosition }
-  | { operation: "platform_size"; preset: PlatformPreset }
-
-export type TextPosition = "top" | "center" | "bottom"
-
-// Standard image sizes per platform placement
-export const PLATFORM_SIZES = {
-  instagram_square: { width: 1080, height: 1080 },
-  instagram_portrait: { width: 1080, height: 1350 },
-  story_reel: { width: 1080, height: 1920 },
-  tiktok: { width: 1080, height: 1920 },
-  youtube_thumbnail: { width: 1280, height: 720 },
-  x_post: { width: 1600, height: 900 },
-  linkedin_post: { width: 1200, height: 627 },
-  facebook_post: { width: 1200, height: 630 },
-  pinterest_pin: { width: 1000, height: 1500 },
-} as const
-export type PlatformPreset = keyof typeof PLATFORM_SIZES
+export { PLATFORM_SIZES, type ImageEdit, type PlatformPreset, type TextPosition } from "@/lib/imagekit/edits"
 
 export function transformation(edit: ImageEdit) {
   switch (edit.operation) {
@@ -148,10 +125,18 @@ export function transformation(edit: ImageEdit) {
       return `e-edit-prompt-${promptParam(edit.prompt)}`
     case "upscale":
       return "e-upscale"
+    case "generate_variation":
+      return "e-genvar"
+    case "retouch":
+      return "e-retouch"
+    case "drop_shadow":
+      return "e-dropshadow"
     case "extend":
       return `w-${edit.width},h-${edit.height},cm-pad_resize,${edit.prompt ? `e-genfill-prompt-${promptParam(edit.prompt)}` : "e-genfill"}`
     case "smart_crop":
       return `w-${edit.width},h-${edit.height},fo-auto`
+    case "face_crop":
+      return `w-${edit.width},h-${edit.height},fo-face`
     case "platform_size": {
       const { width, height } = PLATFORM_SIZES[edit.preset]
       return `w-${width},h-${height},fo-auto`

@@ -202,7 +202,7 @@ export type FindingKind = (typeof FINDING_KINDS)[number]
 export const DRAFT_FORMATS = ["post", "caption", "thread", "carousel", "video_script", "story", "hashtags", "content_idea"] as const
 export type DraftFormat = (typeof DRAFT_FORMATS)[number]
 
-export type DraftStatus = "draft" | "approved" | "scheduled" | "published" | "archived"
+export type DraftStatus = "draft" | "approved" | "pending" | "scheduled" | "published" | "failed" | "archived"
 
 export type SourceLink = { url: string; title: string }
 
