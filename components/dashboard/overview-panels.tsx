@@ -115,7 +115,7 @@ export function CampaignStatusPanel({
 
   return (
     <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex items-center gap-4 bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent p-5">
+      <div className="flex items-center gap-4 bg-gradient-to-br from-brand/10 via-brand/5 to-transparent p-5">
         <CampaignIcon type={campaign.icon_type} icon={campaign.icon} className="size-12 bg-background shadow-md" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -133,8 +133,8 @@ export function CampaignStatusPanel({
       <div className="grid grid-cols-3 divide-x border-y">
         {[
           { label: "Scheduled", value: scheduledCount, Icon: CalendarDays, tone: "text-amber-600 dark:text-amber-400" },
-          { label: "Published", value: publishedCount, Icon: Send, tone: "text-pink-600 dark:text-pink-400" },
-          { label: "Channels", value: channelCount, Icon: Share2, tone: "text-sky-600 dark:text-sky-400" },
+          { label: "Published", value: publishedCount, Icon: Send, tone: "text-brand dark:text-brand-glow" },
+          { label: "Channels", value: channelCount, Icon: Share2, tone: "text-brand dark:text-brand-glow" },
         ].map(({ label, value, Icon, tone }) => (
           <div key={label} className="px-4 py-3.5">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -152,7 +152,7 @@ export function CampaignStatusPanel({
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-[width] duration-700"
+            className="h-full rounded-full bg-gradient-to-r from-brand to-brand transition-[width] duration-700"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -235,9 +235,9 @@ export function UpcomingPostsPanel({ posts }: { posts: ScheduledPost[] }) {
 }
 
 const ACTIVITY_ICONS: Record<ActivityItem["kind"], { Icon: LucideIcon; tone: string }> = {
-  agent: { Icon: Bot, tone: "bg-violet-500/12 text-violet-600 dark:text-violet-400" },
-  post: { Icon: PenSquare, tone: "bg-pink-500/12 text-pink-600 dark:text-pink-400" },
-  account: { Icon: Share2, tone: "bg-sky-500/12 text-sky-600 dark:text-sky-400" },
+  agent: { Icon: Bot, tone: "bg-brand/12 text-brand dark:text-brand-glow" },
+  post: { Icon: PenSquare, tone: "bg-brand/12 text-brand dark:text-brand-glow" },
+  account: { Icon: Share2, tone: "bg-brand/12 text-brand dark:text-brand-glow" },
 }
 
 export function RecentActivityPanel({ activity }: { activity: ActivityItem[] }) {
@@ -246,12 +246,12 @@ export function RecentActivityPanel({ activity }: { activity: ActivityItem[] }) 
       title="Recent activity"
       description="What your agents and team have been up to"
       Icon={History}
-      tone="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+      tone="bg-brand/12 text-brand dark:text-brand-glow"
     >
       {activity.length === 0 ? (
         <PanelEmpty
           Icon={History}
-          tone="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+          tone="bg-brand/12 text-brand dark:text-brand-glow"
           title="No activity yet"
           description="Drafts, approvals and published posts will show up here as your campaign gets going."
         />

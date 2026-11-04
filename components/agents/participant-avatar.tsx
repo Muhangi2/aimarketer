@@ -9,7 +9,7 @@ export function MasterAvatar({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 text-white shadow-md shadow-violet-500/30 ring-2 ring-white dark:ring-slate-900",
+        "relative flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand via-brand to-brand text-white shadow-md shadow-brand/30 ring-2 ring-white dark:ring-slate-900",
         className
       )}
     >
@@ -49,7 +49,7 @@ export function ParticipantAvatar({
 
 const STATUS: Record<AgentStatus, { label: string; badge: string; dot: string }> = {
   idle: { label: "Active", badge: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
-  working: { label: "Working", badge: "bg-blue-500/12 text-blue-700 dark:text-blue-300", dot: "bg-blue-500 animate-pulse" },
+  working: { label: "Working", badge: "bg-brand/12 text-brand-deep dark:text-brand-glow", dot: "bg-brand animate-pulse" },
   paused: { label: "Paused", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
   error: { label: "Needs attention", badge: "bg-destructive/10 text-destructive", dot: "bg-destructive" },
 }

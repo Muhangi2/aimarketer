@@ -95,7 +95,7 @@ export function StatCards({ report, hasMetrics }: { report: AnalyticsReport; has
         caption={c.published ? `${c.deliveries} platform post${c.deliveries === 1 ? "" : "s"} went out` : "Nothing published in this period"}
         delta={percentDelta(c.published, p.published)}
         Icon={Send}
-        tone="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+        tone="bg-brand/12 text-brand dark:text-brand-glow"
       />
       <StatCard
         index={1}
@@ -112,7 +112,7 @@ export function StatCards({ report, hasMetrics }: { report: AnalyticsReport; has
         }
         delta={percentDelta(c.views, p.views)}
         Icon={Eye}
-        tone="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+        tone="bg-brand/12 text-brand dark:text-brand-glow"
         info="Each post's latest lifetime views, counted in the period it was published. Synced from your connected accounts."
       />
       <StatCard

@@ -44,11 +44,11 @@ export function AppSidebar({
           href="/dashboard"
           className="flex h-10 items-center gap-2.5 rounded-xl px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-600/30">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
             <Sparkles className="size-4" />
           </span>
           <span className="truncate text-[15px] font-semibold tracking-tight transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
-            AI Marketer
+            Hively
           </span>
         </Link>
         <CampaignSwitcher campaigns={campaigns} activeId={activeCampaignId} />
@@ -56,7 +56,7 @@ export function AppSidebar({
 
       <SidebarContent className="px-1">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[11px] tracking-wider uppercase">Menu</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {DASHBOARD_NAV.map((item) => {
@@ -68,12 +68,13 @@ export function AppSidebar({
                       tooltip={item.label}
                       onClick={() => isMobile && setOpenMobile(false)}
                       render={<Link href={item.href} />}
-                      className="group/nav h-11 gap-3 rounded-xl px-1.5 text-sidebar-foreground/80 transition-all duration-200 hover:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:font-semibold data-active:text-sidebar-foreground group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:p-1.5!"
+                      // One style for every item: grey icons, the current page on a white pill with a brand icon
+                      className="group/nav h-11 gap-3 rounded-full px-1.5 text-sidebar-foreground/70 transition-all duration-200 hover:bg-white/60 hover:text-sidebar-foreground data-active:bg-white data-active:font-medium data-active:text-sidebar-foreground data-active:shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_16px_-8px_rgba(0,0,0,0.12)] group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:p-1.5!"
                     >
                       <span
                         className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200 group-hover/nav:scale-105",
-                          active ? `${item.activeTone} shadow-md` : item.tone
+                          "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
+                          active ? "bg-brand text-white" : "text-muted-foreground group-hover/nav:text-sidebar-foreground"
                         )}
                       >
                         <item.Icon />

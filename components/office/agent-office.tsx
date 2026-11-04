@@ -225,7 +225,7 @@ function AgentTag({
           className={cn(
             "group/tag relative flex items-center gap-1.5 rounded-full border py-1 pr-2.5 pl-1 text-left shadow-lg backdrop-blur-md transition-all duration-300 outline-none hover:scale-105 hover:pr-3 focus-visible:ring-3 focus-visible:ring-primary/40",
             selected
-              ? "scale-105 border-blue-400/60 bg-primary pr-3 text-primary-foreground shadow-primary/40"
+              ? "scale-105 border-brand-glow/60 bg-primary pr-3 text-primary-foreground shadow-primary/40"
               : "border-white/70 bg-white/90 shadow-black/15 dark:border-white/10 dark:bg-slate-900/85",
             !onSelect && "cursor-default"
           )}
@@ -258,7 +258,7 @@ function AgentTag({
               <span
                 className={cn(
                   "max-w-48 overflow-hidden text-[10px] text-ellipsis whitespace-nowrap",
-                  selected ? "text-blue-100" : "text-slate-500 dark:text-slate-300"
+                  selected ? "text-brand-glow" : "text-slate-500 dark:text-slate-300"
                 )}
               >
                 {caption}
@@ -271,7 +271,7 @@ function AgentTag({
             className={cn(
               "absolute -bottom-1 size-2 -translate-x-1/2 rotate-45 border-r border-b transition-colors duration-300",
               selected
-                ? "border-blue-400/60 bg-primary"
+                ? "border-brand-glow/60 bg-primary"
                 : "border-white/70 bg-white/90 dark:border-white/10 dark:bg-slate-900/85"
             )}
             style={{ left: `calc(50% + ${pointerShift}px)` }}

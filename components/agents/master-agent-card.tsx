@@ -42,8 +42,8 @@ export function MasterAgentCard({
     <div
       className={cn(
         "group/card relative w-full overflow-hidden rounded-2xl p-[1px] transition-shadow duration-300",
-        "bg-gradient-to-r from-violet-500/60 via-fuchsia-500/50 to-amber-400/60",
-        active ? "shadow-lg shadow-violet-500/20" : "hover:shadow-lg hover:shadow-violet-500/15",
+        "bg-gradient-to-r from-brand/60 via-brand/50 to-brand/60",
+        active ? "shadow-lg shadow-brand/20" : "hover:shadow-lg hover:shadow-brand/15",
         className
       )}
     >
@@ -59,7 +59,7 @@ export function MasterAgentCard({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
               <span className="text-base font-semibold tracking-tight">{MASTER_ROLE.name}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand/12 px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep dark:text-brand-glow">
                 <Sparkles className="size-3" /> Coordinator
               </span>
               <AgentStatusBadge status={status} />
@@ -68,7 +68,7 @@ export function MasterAgentCard({
             {open && openTasks.length > 0 && (
               <span className="mt-2 block h-1 max-w-56 overflow-hidden rounded-full bg-muted">
                 <span
-                  className="block h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-500 transition-all duration-500"
+                  className="block h-full rounded-full bg-gradient-to-r from-brand to-brand transition-all duration-500"
                   style={{ width: `${(done / openTasks.length) * 100}%` }}
                 />
               </span>
@@ -81,7 +81,7 @@ export function MasterAgentCard({
 
         {/* The team the Master Agent leads: each agent opens its own chat */}
         {!compact && (
-          <div className="border-t border-violet-500/15 px-4 pt-3 pb-4">
+          <div className="border-t border-brand/15 px-4 pt-3 pb-4">
             <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Your team</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {AGENT_KEYS.map((key) => {

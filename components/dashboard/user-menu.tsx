@@ -6,6 +6,7 @@ import type { DashboardUser } from "@/lib/dashboard"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -27,7 +28,7 @@ export function UserAvatar({ user, className = "size-8" }: { user: DashboardUser
     <img src={user.avatarUrl} alt="" className={`${className} shrink-0 rounded-full object-cover`} />
   ) : (
     <span
-      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-semibold text-white`}
+      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white`}
     >
       {initials}
     </span>
@@ -63,13 +64,16 @@ export function UserMenu({ user }: { user: DashboardUser }) {
             sideOffset={10}
             className="w-60 rounded-xl p-1.5"
           >
-            <DropdownMenuLabel className="flex items-center gap-2.5 p-2 font-normal">
-              <UserAvatar user={user} />
-              <span className="grid min-w-0 leading-tight">
-                <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
-                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-              </span>
-            </DropdownMenuLabel>
+            {/* Base UI only allows a label inside a group */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex items-center gap-2.5 p-2 font-normal">
+                <UserAvatar user={user} />
+                <span className="grid min-w-0 leading-tight">
+                  <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                </span>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator className="my-1.5" />
             <DropdownMenuItem variant="destructive" className="rounded-lg p-2" onClick={() => signOut()}>
               <LogOut /> Sign out

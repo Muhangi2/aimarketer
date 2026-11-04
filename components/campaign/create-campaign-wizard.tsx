@@ -148,7 +148,7 @@ export function CreateCampaignWizard({
         <div className="mt-auto flex flex-col gap-3">
           <p className="text-xs font-medium text-muted-foreground">Preview</p>
           <div className="overflow-hidden rounded-xl border bg-background">
-            <div className="relative aspect-[16/9] bg-gradient-to-br from-blue-100 to-indigo-100">
+            <div className="relative aspect-[16/9] bg-gradient-to-br from-brand-glow to-brand-glow">
               {selectedOffice && (
                 <Image src={selectedOffice.src} alt="" fill sizes="300px" className="object-cover" />
               )}

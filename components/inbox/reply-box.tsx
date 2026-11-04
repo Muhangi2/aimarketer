@@ -87,7 +87,7 @@ export function ReplyBox({
         />
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={draft} disabled={drafting || sending} className="border-violet-500/30 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300">
+        <Button size="sm" variant="outline" onClick={draft} disabled={drafting || sending} className="border-brand/30 text-brand-deep hover:bg-brand/10 dark:text-brand-glow">
           {drafting ? <Spinner data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
           {drafting ? "Drafting…" : drafted ? "Draft again" : "Draft with AI"}
         </Button>

@@ -6,7 +6,7 @@ export function AgentAvatar({ seat, className }: { seat: OfficeSeat; className?:
   return (
     <span
       className={cn(
-        "relative block size-11 shrink-0 overflow-hidden rounded-full bg-gradient-to-b from-sky-100 to-blue-200 ring-2 ring-white dark:from-slate-700 dark:to-slate-800 dark:ring-slate-900",
+        "relative block size-11 shrink-0 overflow-hidden rounded-full bg-gradient-to-b from-brand-glow to-brand-glow ring-2 ring-white dark:from-slate-700 dark:to-slate-800 dark:ring-slate-900",
         className
       )}
     >

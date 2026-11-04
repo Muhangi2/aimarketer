@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         className="h-svh overflow-hidden"
       >
         <AppSidebar user={user} campaigns={campaigns} activeCampaignId={activeCampaign.id} />
-        <SidebarInset className="min-w-0 overflow-hidden bg-muted/40">
+        <SidebarInset className="min-w-0 overflow-hidden bg-background">
           <DashboardHeader user={user} campaignName={activeCampaign.name} />
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </SidebarInset>

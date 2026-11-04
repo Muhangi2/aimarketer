@@ -22,7 +22,7 @@ export default async function IntegrationsPage() {
         <p className="mt-1 text-sm text-muted-foreground">Connect the services your posts go out through. Keys are stored encrypted and only used on our server.</p>
       </div>
       <section className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-5 py-4 shadow-sm">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 to-sky-600 text-sm font-bold text-white shadow-sm">Z</span>
+        <span className="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-brand to-brand text-sm font-bold text-white shadow-sm">Z</span>
         <div className="min-w-0 flex-1">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             Zernio

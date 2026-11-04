@@ -190,7 +190,7 @@ export function PostDetailSheet({
                   ) : result.status === "failed" ? (
                     <span className="text-destructive">{result.error ?? "Failed"}</span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300">
+                    <span className="inline-flex items-center gap-1 text-brand-deep dark:text-brand-glow">
                       <Clock className="size-3" /> Processing
                     </span>
                   )}

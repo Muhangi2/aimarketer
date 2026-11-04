@@ -34,8 +34,8 @@ const KIND_LABEL: Partial<Record<MessageKind, string>> = {
 }
 
 const KIND_TONE: Partial<Record<MessageKind, string>> = {
-  plan: "border border-violet-500/25 bg-violet-500/8",
-  assignment: "border border-violet-500/25 bg-violet-500/8",
+  plan: "border border-brand/25 bg-brand/8",
+  assignment: "border border-brand/25 bg-brand/8",
   clarification: "border border-amber-500/30 bg-amber-500/10",
   summary: "border border-emerald-500/25 bg-emerald-500/8",
 }
