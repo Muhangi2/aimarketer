@@ -6,6 +6,7 @@ const bodySchema = z.object({ campaignId: z.string().uuid() })
 
 // Clears one agent's chat. Tasks and their results are kept
 export async function DELETE(request: Request, { params }: { params: Promise<{ agent: string }> }) {
+  //validationcross checking
   const { agent } = await params
   if (!isThreadKey(agent)) return jsonError(404, "Unknown agent")
 

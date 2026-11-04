@@ -47,3 +47,5 @@ next-env.d.ts
 .roo
 .trae
 .windsurf
+
+.claude/settings.local.json

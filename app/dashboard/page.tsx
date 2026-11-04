@@ -10,6 +10,9 @@ import {
   type ScheduledPost,
 } from "@/components/dashboard/overview-panels"
 import type { RequestStatus } from "@/lib/agents/types"
+import { createInsForgeServerClient } from "@/lib/insforge/server"
+import { PLATFORMS, isPostPlatform } from "@/lib/posts/platforms"
+import { listUpcomingPosts } from "@/lib/posts/store"
 
 const REQUEST_ACTIVITY: Record<RequestStatus, string> = {
   planning: "is planning",
@@ -24,14 +27,20 @@ const REQUEST_ACTIVITY: Record<RequestStatus, string> = {
 export default async function DashboardOverviewPage({ searchParams }: { searchParams: Promise<{ agent?: string }> }) {
   const { user, activeCampaign: campaign } = await getDashboardContext()
   const firstName = user.name.split(" ")[0]
-  const [officeScene, snapshot, { agent }] = await Promise.all([
+  const [officeScene, snapshot, { agent }, upcoming] = await Promise.all([
     getOfficeScene(campaign.office_image),
     getWorkspaceSnapshot(campaign.id, user.id),
     searchParams,
+    listUpcomingPosts(await createInsForgeServerClient(), campaign.id),
   ])
 
-  // Posts and channels are not stored yet; wire these up once their tables exist
-  const scheduledPosts: ScheduledPost[] = []
+  // Channels are not stored yet; wire them up once their table exists
+  const scheduledPosts: ScheduledPost[] = upcoming.map((p) => ({
+    id: p.id,
+    content: p.title,
+    channel: p.platforms.map((x) => (isPostPlatform(x) ? PLATFORMS[x].label : x)).join(", "),
+    scheduledAt: p.scheduledAt!,
+  }))
   // Recent Master Agent requests double as the activity feed
   const activity: ActivityItem[] = snapshot.requests.slice(0, 5).map((r) => ({
     id: r.id,
