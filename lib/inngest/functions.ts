@@ -1,5 +1,5 @@
-import { NonRetriableError } from "inngest"
-import { inngest, taskExecuteEvent } from "@/lib/inngest/client"
+import { NonRetriableError, RetryAfterError } from "inngest"
+import { inngest, postPublishEvent, taskExecuteEvent } from "@/lib/inngest/client"
 import { getInsForgeAdmin } from "@/lib/insforge/admin"
 import { COMPUTER_AGENT_KEYS, isComputerAgent } from "@/lib/agent-roles"
 import { DISPATCH_WINDOW_MS, iso } from "@/lib/agents/schedule"
@@ -25,6 +25,23 @@ import {
 import { markCampaignEnded, shutDownComputer, stopCampaignPlans } from "@/lib/computers/campaign"
 import { pauseDesktop } from "@/lib/computers/desktop"
 import { ComputerStore, listIdleComputers } from "@/lib/computers/store"
+import { BlotatoError } from "@/lib/blotato/client"
+import { ZernioError } from "@/lib/zernio/client"
+import { listZernioUsers, syncAnalyticsFor } from "@/lib/analytics/sync"
+import {
+  PublishError,
+  buildSubmissions,
+  checkPublishStatus,
+  claimPost,
+  failPost,
+  cancelOnZernio,
+  finishPost,
+  heldOnZernio,
+  listDuePosts,
+  savePublishResults,
+  submitPost,
+} from "@/lib/posts/publish"
+import type { PublishResult } from "@/lib/posts/types"
 
 // Claim slightly more than the 15 minute interval so cron jitter never leaves a gap.
 // Overlap is harmless: a task can only be claimed once.
@@ -44,6 +61,10 @@ const USER_WAIT_CHUNK = "30m"
 const MAX_USER_WAIT_CHECKS = 50
 // Desktops nobody used for this long are paused
 const IDLE_PAUSE_MS = 3 * 60 * 1000
+// Zernio and Blotato publish in the background: check every 15 seconds for up to ~12 minutes
+// (videos take a while to process)
+const PUBLISH_CHECK_INTERVAL = "15s"
+const MAX_PUBLISH_CHECKS = 48
 
 type Stopped = { kind: "stopped"; reason: string }
 
@@ -94,7 +115,13 @@ export const dispatchDueTasks = inngest.createFunction(
 
     const events = [...claimed, ...stale].map(toEvent)
     if (events.length > 0) await step.sendEvent("send-task-events", events)
-    return { claimed: claimed.length, resent: stale.length }
+
+    // Scheduled posts due before the next run, or missed: (re)send their publish events. The
+    // event id makes this a no-op for posts whose event already arrived when they were scheduled.
+    const duePosts = await step.run("find-due-posts", () => listDuePosts(Date.now() + DISPATCH_WINDOW_MS + 60_000))
+    if (duePosts.length > 0) await step.sendEvent("send-post-events", duePosts.map(postPublishEvent))
+
+    return { claimed: claimed.length, resent: stale.length, posts: duePosts.length }
   }
 )
 
@@ -184,7 +211,7 @@ export const executeTask = inngest.createFunction(
       const instruction: string | null = lastAttempt ? [feedback, DELIVER_NOW].filter(Boolean).join("\n") : feedback
       const result: AgentAttempt | Stopped = isComputerAgent(task.agentKey)
         ? await computerAttempt(attempt, instruction)
-        : await step.run(`agent-attempt-${attempt}`, (): Promise<AgentAttempt> => runAgent(task, campaignName, inputs, clarifications, instruction))
+        : await step.run(`agent-attempt-${attempt}`, (): Promise<AgentAttempt> => runAgent(task, campaignName, inputs, clarifications, instruction, ctx))
       if (result.kind === "stopped") return { action: "stopped", reason: result.reason }
 
       if (result.kind === "question") {
@@ -268,4 +295,114 @@ export const endCampaign = inngest.createFunction(
   }
 )
 
-export const functions = [dispatchDueTasks, executeTask, pauseIdleComputers, endCampaign]
+// Turns errors from the publish steps into Inngest's retry behaviour
+async function publishStep<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    if (error instanceof PublishError) throw new NonRetriableError(error.message)
+    if ((error instanceof BlotatoError || error instanceof ZernioError) && error.status === 429) {
+      throw new RetryAfterError(error.message, (error.retryAfter ?? 60) * 1000)
+    }
+    throw error
+  }
+}
+
+/**
+ * Publishes one scheduled post through the user's accounts (Zernio or Blotato): waits until it's
+ * due, claims it (skipped if it was edited or rescheduled since), sends each platform's copy, then
+ * checks until each one is published or failed.
+ */
+export const publishPost = inngest.createFunction(
+  {
+    id: "publish-scheduled-post",
+    name: "Publish scheduled post",
+    retries: 4,
+    // One user's posts go out a few at a time, well under Zernio's and Blotato's rate limits
+    concurrency: [{ key: "event.data.userId", limit: 2 }],
+    idempotency: 'event.data.postId + "-" + event.data.scheduledAt',
+    onFailure: async ({ event, error }) => {
+      const { postId, userId } = event.data.event.data
+      await failPost(postId, userId, error.message || "Publishing failed after several attempts.")
+    },
+  },
+  { event: "post/publish" },
+  async ({ event, step }) => {
+    const { postId, userId, scheduledAt } = event.data
+    await step.sleepUntil("wait-until-scheduled", new Date(scheduledAt))
+
+    const post = await step.run("claim", () => claimPost(postId, userId, scheduledAt))
+    if (!post) return { action: "skipped", reason: "The post was changed, rescheduled or deleted" }
+
+    const submissions = await step.run("prepare", () => publishStep(() => buildSubmissions(post, userId, scheduledAt)))
+    // Copies Zernio already holds publish on their own; they're only followed up here
+    const held = heldOnZernio(post.publishResults)
+    // Fixed once, so a retried submit step sends the very same request
+    const submitAt = await step.run("submit-at", () => new Date(Date.now() + 60_000).toISOString())
+
+    // One step per platform, so a retry never posts the same platform twice
+    let results: PublishResult[] = []
+    for (const submission of submissions) {
+      const copy = held.find((r) => r.platform === submission.platform && r.accountId === submission.accountId)
+      const result: PublishResult = copy
+        ? { ...copy, status: "in-progress" }
+        : await step.run(`submit-${submission.platform}`, () => publishStep(() => submitPost(userId, submission, submitAt)))
+      results = [...results, result]
+      await step.run(`save-${submission.platform}`, () => savePublishResults(postId, userId, results))
+    }
+
+    // Copies left over from an edit Zernio couldn't be told about
+    const stale = held.filter((r) => !results.some((x) => x.submissionId === r.submissionId))
+    if (stale.length > 0) await step.run("cancel-stale", () => cancelOnZernio(userId, stale))
+
+    for (let i = 0; i < MAX_PUBLISH_CHECKS && results.some((r) => r.status === "in-progress"); i++) {
+      await step.sleep(`wait-for-publish-${i}`, PUBLISH_CHECK_INTERVAL)
+      results = await step.run(`check-${i}`, () => publishStep(() => checkPublishStatus(userId, results)))
+    }
+
+    const outcome = await step.run("finish", () => finishPost(postId, userId, results))
+    return { action: outcome.status, results }
+  }
+)
+
+/** Every 6 hours: queue an analytics sync for each user with a Zernio profile. */
+export const sweepAnalytics = inngest.createFunction(
+  { id: "sweep-analytics", name: "Queue analytics syncs" },
+  { cron: "0 */6 * * *" },
+  async ({ step }) => {
+    const users = await step.run("list-users", () => listZernioUsers())
+    if (users.length === 0) return { queued: 0 }
+    // The hour in the id makes a re-run of the same sweep a no-op
+    const hour = new Date().toISOString().slice(0, 13)
+    await step.sendEvent(
+      "queue-syncs",
+      users.map((userId) => ({ name: "analytics/sync" as const, id: `analytics-${userId}-${hour}`, data: { userId } }))
+    )
+    return { queued: users.length }
+  }
+)
+
+/** Copies one user's post analytics from Zernio into the database. */
+export const syncAnalytics = inngest.createFunction(
+  {
+    id: "sync-analytics",
+    name: "Sync post analytics",
+    retries: 3,
+    // One sync per user at a time, and a few users at once, well under Zernio's rate limits
+    concurrency: [{ key: "event.data.userId", limit: 1 }, { limit: 3 }],
+  },
+  { event: "analytics/sync" },
+  async ({ event, step }) => {
+    const result = await step.run("sync", async () => {
+      try {
+        return await syncAnalyticsFor(event.data.userId)
+      } catch (error) {
+        if (error instanceof ZernioError && error.status === 429) throw new RetryAfterError(error.message, (error.retryAfter ?? 60) * 1000)
+        throw error
+      }
+    })
+    return result
+  }
+)
+
+export const functions = [dispatchDueTasks, executeTask, pauseIdleComputers, endCampaign, publishPost, sweepAnalytics, syncAnalytics]

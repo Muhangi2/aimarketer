@@ -1,14 +1,20 @@
 import "server-only"
 import { assistant, run, system, user } from "@openai/agents"
 import { z } from "zod"
-import { getChatAgent, roleReminder, ROLES } from "@/lib/ai/agents"
+import { getChatAgent, roleReminder, ROLES, type ChatToolset } from "@/lib/ai/agents"
 import { completeJSON } from "@/lib/ai/llm"
+import { analyticsTools, performanceSummary } from "@/lib/agents/tools/analytics"
+import { connectBlotatoMcp } from "@/lib/blotato/mcp"
+import { connectPostizMcp } from "@/lib/postiz/mcp"
+import { connectZernioMcp } from "@/lib/zernio/mcp"
 import type { AgentKey } from "@/lib/agent-roles"
 import type { AgentStore } from "@/lib/agents/store"
 import type { AgentMessage } from "@/lib/agents/types"
 
 // Context window sent to the model: enough for a conversation, bounded for a small local model
 const MAX_HISTORY = 20
+// With MCP tools the agent may look a few things up before answering
+const MAX_TOOL_TURNS = 5
 
 export const chatRequestSchema = z.object({
   campaignId: z.string().uuid(),
@@ -101,12 +107,49 @@ export async function streamAgentReply({
   }
 
   const input = [...toModelInput(agentKey, history), user(message), system(roleReminder(agentKey))]
-  const result = await run(getChatAgent(agentKey), input, {
-    stream: true,
-    context: { campaignName, taskBrief: await taskBrief(store, agentKey) },
-    signal,
-    maxTurns: 1,
-  })
+  // The user's own Zernio, Blotato and Postiz accounts, read-only, for whichever they connected
+  const isAnalytics = agentKey === "analytics"
+  const scope = { userId: store.userId, campaignId: store.campaignId, campaignName }
+  const [zernio, blotato, postiz, brief, dataBrief] = await Promise.all([
+    connectZernioMcp(store.userId),
+    connectBlotatoMcp(store.userId),
+    connectPostizMcp(store.userId),
+    taskBrief(store, agentKey),
+    // The Analytics Agent starts from the campaign's real numbers, even if the model skips its tools
+    isAnalytics
+      ? performanceSummary(scope).catch((error) => {
+          console.error("Could not load the analytics summary for chat", error)
+          return undefined
+        })
+      : undefined,
+  ])
+  const connected = { zernio, blotato, postiz }
+  const toolsets = (Object.keys(connected) as ChatToolset[]).filter((k) => connected[k])
+  const servers = toolsets.map((k) => connected[k]!)
+  let closed = false
+  const closeServers = async () => {
+    if (servers.length === 0 || closed) return
+    closed = true
+    await Promise.all(servers.map((s) => s.close().catch((error) => console.error(`Could not close the ${s.name} MCP connection`, error))))
+  }
+  // The browser went away mid-reply: flush won't run
+  signal?.addEventListener("abort", () => void closeServers(), { once: true })
+
+  const ownTools = isAnalytics ? analyticsTools(scope) : []
+  let result
+  try {
+    const base = getChatAgent(agentKey, toolsets)
+    const agent = servers.length || ownTools.length ? base.clone({ mcpServers: servers, tools: ownTools }) : base
+    result = await run(agent, input, {
+      stream: true,
+      context: { campaignName, taskBrief: brief, dataBrief },
+      signal,
+      maxTurns: servers.length || ownTools.length ? MAX_TOOL_TURNS : 1,
+    })
+  } catch (error) {
+    await closeServers()
+    throw error
+  }
 
   // The SDK types this with its own stream shim; at runtime it is the platform's web ReadableStream
   const text = result.toTextStream() as unknown as ReadableStream<string>
@@ -119,6 +162,7 @@ export async function streamAgentReply({
           controller.enqueue(chunk)
         },
         async flush() {
+          await closeServers()
           if (reply.trim()) await save(reply)
         },
       })

@@ -4,15 +4,30 @@ import { POST_PLATFORMS } from "@/lib/posts/platforms"
 
 /* Posts shown on the Posts page: manual posts and the Creator Agent's drafts (content_draft). */
 
-export const POST_STATUSES = ["draft", "approved", "pending", "scheduled", "published", "failed", "archived"] as const
+export const POST_STATUSES = ["draft", "approved", "pending", "scheduled", "publishing", "published", "failed", "archived"] as const
 export type PostStatus = (typeof POST_STATUSES)[number]
 
 export type PostMedia = {
   url: string
+  // Videos can't be edited; YouTube only takes a video
+  kind: "image" | "video"
   // The image before any edits (uploaded or generated)
   originalUrl: string | null
   edits: ImageEditOperation[]
   origin: "upload" | "generated" | "agent"
+}
+
+// How one platform's copy of a post went out (through Zernio or Blotato)
+export type PublishResult = {
+  platform: string
+  // Older results have no provider: they went through Blotato
+  provider?: "zernio" | "blotato"
+  accountId: string
+  submissionId: string | null
+  // scheduled: handed to Zernio ahead of time, which publishes it at the scheduled time itself
+  status: "scheduled" | "in-progress" | "published" | "failed"
+  publicUrl: string | null
+  error: string | null
 }
 
 export type PostRecord = {
@@ -27,18 +42,24 @@ export type PostRecord = {
   status: PostStatus
   scheduledAt: string | null
   timezone: string | null
+  // Account per platform, "zernio:<id>" or "blotato:<id>" (a bare id is Blotato)
+  targetAccounts: Record<string, string>
+  publishResults: PublishResult[]
+  publishedAt: string | null
+  publishError: string | null
   createdAt: string
   updatedAt: string
 }
 
-// Statuses whose post can still be edited and (re)scheduled: anything not yet published
-const LOCKED_STATUSES: PostStatus[] = ["published", "archived"]
+// Statuses whose post can still be edited and (re)scheduled: anything not going out or gone out
+const LOCKED_STATUSES: PostStatus[] = ["publishing", "published", "archived"]
 
 /** Whether the post hasn't gone out yet, so the user can still change or reschedule it. */
 export const isEditablePost = (post: Pick<PostRecord, "status">) => !LOCKED_STATUSES.includes(post.status)
 
 export const postMediaSchema = z.object({
   url: z.string().url(),
+  kind: z.enum(["image", "video"]).default("image"),
   originalUrl: z.string().url().nullable().default(null),
   edits: z.array(z.enum(IMAGE_EDIT_OPERATIONS)).max(30).default([]),
   origin: z.enum(["upload", "generated", "agent"]).default("upload"),
@@ -55,6 +76,8 @@ export const savePostSchema = z.object({
   hashtags: z.array(z.string()).max(40).default([]),
   platforms: z.array(z.enum(POST_PLATFORMS)).min(1, "Pick at least one platform.").max(POST_PLATFORMS.length),
   media: z.array(postMediaSchema).max(10).default([]),
+  // Which connected Blotato account each platform posts to
+  targetAccounts: z.record(z.string(), z.string().min(1).max(100)).default({}),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   time: z.string().regex(/^\d{2}:\d{2}$/).nullable().default(null),
   timezone: z.string().max(80).nullable().default(null),

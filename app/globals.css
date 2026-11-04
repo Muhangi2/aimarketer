@@ -76,6 +76,15 @@
     --chart-3: oklch(0.488 0.243 264.376);
     --chart-4: oklch(0.707 0.165 254.624);
     --chart-5: oklch(0.809 0.105 251.813);
+    /* Analytics: validated categorical slots (platform identity) and the reserved "failed" status */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+    --viz-4: #eda100;
+    --viz-5: #e87ba4;
+    --viz-6: #008300;
+    --viz-other: #8b8a85;
+    --viz-critical: #d03b3b;
     --radius: 0.75rem;
     --sidebar: oklch(1 0 0);
     --sidebar-foreground: oklch(0.208 0.042 265.755);
@@ -111,6 +120,14 @@
     --chart-3: oklch(0.488 0.243 264.376);
     --chart-4: oklch(0.707 0.165 254.624);
     --chart-5: oklch(0.809 0.105 251.813);
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-other: #8b8a85;
+    --viz-critical: #d03b3b;
     --sidebar: oklch(0.208 0.042 265.755);
     --sidebar-foreground: oklch(0.984 0.003 247.858);
     --sidebar-primary: oklch(0.623 0.214 259.815);

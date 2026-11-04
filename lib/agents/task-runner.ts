@@ -1,7 +1,11 @@
 import "server-only"
 import { MASTER_KEY, isComputerAgent, type ComputerAgentKey } from "@/lib/agent-roles"
 import { QUESTION_PREFIX, ROLES, taskPrompt, taskSystemPrompt } from "@/lib/ai/agents"
+import { Agent, run } from "@openai/agents"
+import { chatModel, isModelUnavailable } from "@/lib/ai/client"
 import { completeText } from "@/lib/ai/llm"
+import { analyticsTools, performanceSummary } from "@/lib/agents/tools/analytics"
+import { scheduledForRequest, schedulerTools } from "@/lib/agents/tools/scheduler"
 import { answerAgentQuestion, reviewOutput, summarize } from "@/lib/ai/master"
 import { dispatchDueTasks } from "@/lib/agents/dispatch"
 import { OutputStore } from "@/lib/agents/outputs"
@@ -202,21 +206,79 @@ async function inputsFor(store: AgentStore, task: AgentTaskRecord): Promise<Task
     .map((d) => ({ agentName: ROLES[d.agentKey].name, title: d.title, output: d.output! }))
 }
 
+// The Analytics and Scheduler Agents may call a few tools before writing
+const TOOL_MAX_TURNS = 8
+
+/** Runs a task with tools; returns the final text, or null if the model couldn't run them. */
+async function runWithTools(name: string, system: string, prompt: string, tools: ReturnType<typeof schedulerTools>) {
+  try {
+    const agent = new Agent({ name, model: chatModel(), modelSettings: { temperature: 0.3 }, instructions: system, tools })
+    const result = await run(agent, prompt, { maxTurns: TOOL_MAX_TURNS })
+    const text = typeof result.finalOutput === "string" ? result.finalOutput.trim() : ""
+    return text || null
+  } catch (error) {
+    console.error(`The ${name}'s tool run failed`, error)
+    return null
+  }
+}
+
+/** The Scheduler Agent's attempt: it can schedule the team's drafts to publish. */
+async function runSchedulerAgent(ctx: RunContext, task: AgentTaskRecord, system: string, prompt: string) {
+  const timeZone = task.instructions.match(/time zone: ([A-Za-z_]+(?:\/[A-Za-z_+-]+)*)/)?.[1] ?? "UTC"
+  const now = new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "full", timeStyle: "short" }).format(Date.now())
+  const withTime = `${prompt}\n\nRight now it is ${now} in the user's time zone (${timeZone}).`
+  const log: string[] = []
+  const tools = schedulerTools({ userId: ctx.userId, campaignId: ctx.campaignId, requestId: task.requestId, log })
+  const text = await runWithTools(ROLES.scheduler.name, system, withTime, tools)
+  if (!text) {
+    // No tool run: a plan is still useful, but it must not read as if anything was scheduled
+    const plan = await completeText([{ role: "system", content: system }, { role: "user", content: withTime }], { temperature: 0.4 })
+    return `${plan}\n\n(Nothing was scheduled automatically. Schedule the draft on the Posts page.)`
+  }
+  // What the tool really did leads, whatever the model wrote
+  return log.length ? `${log.join("\n")}\n\n${text}` : text
+}
+
+/**
+ * The Analytics Agent's attempt: it gets the campaign's real headline numbers up front and its
+ * analytics tools for anything else. If the model can't call tools, it still answers from the
+ * numbers it was given.
+ */
+async function runAnalyticsAgent(ctx: RunContext, campaign: string, system: string, prompt: string) {
+  const scope = { userId: ctx.userId, campaignId: ctx.campaignId, campaignName: campaign }
+  const summary = await performanceSummary(scope).catch((error) => {
+    console.error("Could not load the analytics summary for a task", error)
+    return "The analytics data couldn't be loaded right now."
+  })
+  const withData = `${prompt}\n\nThe campaign's real numbers for the last 30 days:\n${summary}`
+  const text = await runWithTools(ROLES.analytics.name, system, withData, analyticsTools(scope))
+  if (text) return text
+  return completeText([{ role: "system", content: system }, { role: "user", content: withData }], { temperature: 0.4 })
+}
+
 /** One attempt by the agent. Returns its work, or the question it needs answered. */
 export async function runAgent(
   task: AgentTaskRecord,
   campaign: string,
   inputs: TaskInput[],
   clarifications: string | null,
-  feedback: string | null
+  feedback: string | null,
+  ctx?: RunContext
 ): Promise<AgentAttempt> {
-  const output = await completeText(
-    [
-      { role: "system", content: taskSystemPrompt(task.agentKey, campaign) },
-      { role: "user", content: taskPrompt({ title: task.title, instructions: task.instructions, inputs, clarifications, feedback }) },
-    ],
-    { temperature: 0.6 }
-  )
+  const system = taskSystemPrompt(task.agentKey, campaign)
+  const prompt = taskPrompt({ title: task.title, instructions: task.instructions, inputs, clarifications, feedback })
+  const output =
+    task.agentKey === "analytics" && ctx
+      ? await runAnalyticsAgent(ctx, campaign, system, prompt)
+      : task.agentKey === "scheduler" && ctx
+        ? await runSchedulerAgent(ctx, task, system, prompt)
+        : await completeText(
+          [
+            { role: "system", content: system },
+            { role: "user", content: prompt },
+          ],
+          { temperature: 0.6 }
+        )
   if (!output) throw new Error(`The ${ROLES[task.agentKey].name} returned an empty answer.`)
 
   const firstLine = output.trim().split("\n")[0]?.trim() ?? ""
@@ -291,10 +353,17 @@ export async function reviewWork(
   await post(store, { thread: task.agentKey, sender: task.agentKey, recipient: MASTER_KEY, kind: "result", content: output, ...meta })
   await store.transitionTask(task.id, ctx.queuedAt, "in_progress", { status: "in_review" })
 
-  const evidence = isComputerAgent(task.agentKey) ? await computerEvidence(ctx, task) : null
-  // Reviewed against the latest instructions, which include details the user added mid-task
-  const latest = (await store.getTask(task.id).catch(() => null)) ?? task
-  const review = await reviewOutput({ campaignName: campaign, task: latest, output, evidence }).catch(() => ({ approved: true, feedback: "" }))
+  const evidence = isComputerAgent(task.agentKey)
+    ? await computerEvidence(ctx, task)
+    : task.agentKey === "analytics"
+      ? await performanceSummary({ userId: ctx.userId, campaignId: ctx.campaignId, campaignName: campaign }).catch(() => null)
+      : task.agentKey === "scheduler"
+        ? await scheduledForRequest({ userId: ctx.userId, campaignId: ctx.campaignId, requestId: task.requestId }).catch(() => null)
+        : null
+  // Reviewed against the latest instructions, which include details the user added mid-task,
+  // and the user's own words (e.g. "don't search the web")
+  const [latest, request] = await Promise.all([store.getTask(task.id).catch(() => null), store.getRequest(task.requestId).catch(() => null)])
+  const review = await reviewOutput({ campaignName: campaign, task: latest ?? task, output, evidence, userRequest: request?.prompt ?? null }).catch(() => ({ approved: true, feedback: "" }))
   const feedback = review.feedback.trim()
   if (!review.approved && feedback && canRevise) {
     await post(store, { thread: task.agentKey, sender: MASTER_KEY, recipient: task.agentKey, kind: "review", content: `Please revise: ${feedback}`, ...meta })
@@ -523,7 +592,15 @@ export async function computerSlice(
     return { kind: "stopped", reason: `The task is ${current?.status.replace("_", " ") ?? "gone"}.` }
   }
   // The fresh copy carries details the user added after the task started
-  return runComputerSlice({ computers: computersFor(ctx), agents: store, task: current, campaignName: campaign, attempt, inputs, clarifications, feedback })
+  try {
+    return await runComputerSlice({ computers: computersFor(ctx), agents: store, task: current, campaignName: campaign, attempt, inputs, clarifications, feedback })
+  } catch (error) {
+    // The step is retried; meanwhile say why the agent is stalled instead of its last action
+    if (isModelUnavailable(error)) {
+      await store.setActivity(task.agentKey, "The AI model is busy right now. Retrying shortly…").catch(() => undefined)
+    }
+    throw error
+  }
 }
 
 /**

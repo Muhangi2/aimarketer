@@ -8,11 +8,12 @@ async function send(url: string, init: RequestInit) {
   return body ?? {}
 }
 
-export async function uploadPostImage(campaignId: string, file: File) {
+/** Uploads an image or a video for a post. */
+export async function uploadPostMedia(campaignId: string, file: File) {
   const form = new FormData()
   form.append("campaignId", campaignId)
   form.append("file", file)
-  return (await send("/api/posts/media", { method: "POST", body: form })) as { url: string }
+  return (await send("/api/posts/media", { method: "POST", body: form })) as { url: string; kind: "image" | "video" }
 }
 
 export async function generatePostImage(campaignId: string, prompt: string, aspectRatio: string) {
@@ -33,5 +34,5 @@ export async function editPostImage(campaignId: string, imageUrl: string, params
 
 /** Small preview from ImageKit's on-the-fly resizing; other hosts get the original. */
 export function thumbUrl(url: string, width = 480) {
-  return url.includes("imagekit.io") ? `${url}${url.includes("?") ? "&" : "?"}tr=w-${width},c-at_max` : url
+  return url.includes("imagekit.io") && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url) ? `${url}${url.includes("?") ? "&" : "?"}tr=w-${width},c-at_max` : url
 }

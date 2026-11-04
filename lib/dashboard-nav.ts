@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   CalendarDays,
+  Inbox,
   LayoutDashboard,
   PenSquare,
   Settings,
@@ -47,6 +48,15 @@ export const DASHBOARD_NAV: NavItem[] = [
     Icon: PenSquare,
     tone: "bg-pink-500/12 text-pink-600 dark:text-pink-400",
     activeTone: "bg-pink-600 text-white shadow-pink-600/30",
+  },
+  {
+    slug: "inbox",
+    href: "/dashboard/inbox",
+    label: "Inbox",
+    description: "Comments and messages from your accounts",
+    Icon: Inbox,
+    tone: "bg-indigo-500/12 text-indigo-600 dark:text-indigo-400",
+    activeTone: "bg-indigo-600 text-white shadow-indigo-600/30",
   },
   {
     slug: "calendar",
