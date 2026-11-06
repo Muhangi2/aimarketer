@@ -17,6 +17,7 @@ import { encodeTarget, parseTarget, type PublishingAccount } from "@/lib/posts/t
 import { formatInZone, zoneLabel } from "@/lib/posts/time"
 import { isEditablePost, type PostRecord } from "@/lib/posts/types"
 import { STATUS_STYLE } from "@/components/calendar/status"
+import { toast } from "@/components/ui/toast"
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -237,6 +238,7 @@ export function PostDetailSheet({
                   startDelete(async () => {
                     const r = await deletePost(post.id)
                     if (!r.ok) return setError(r.error ?? "Couldn't delete the post.")
+                    toast.add({ title: "Post deleted", type: "success" })
                     onDeleted(post.id)
                   })
                 }

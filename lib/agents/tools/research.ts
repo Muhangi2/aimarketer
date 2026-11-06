@@ -22,7 +22,7 @@ export function saveFindingTool(session: Session) {
       platform: z.string().nullable().default(null).describe("instagram, tiktok, youtube, x, linkedin, facebook, reddit, pinterest, google or web"),
       sources: z.array(z.string()).default([]).describe('URLs of pages this came from, e.g. "https://..." or "Title | https://..."'),
       tags: z.array(z.string()).default([]).describe("A few keywords to find it later"),
-      basis: z.enum(["knowledge", "web"]).catch("knowledge").describe('"web" if you checked it in the browser this task, otherwise "knowledge"'),
+      basis: z.enum(["knowledge", "web"]).catch("knowledge").describe('"web" if you checked it on the web this task (quick_search or the browser), otherwise "knowledge"'),
     }),
     execute: async (input, ctx) => {
       const memory = memoryOf(ctx)
@@ -37,7 +37,7 @@ export function saveFindingTool(session: Session) {
         details: input.details,
         sources,
         tags: input.tags,
-        // Only work checked in the browser counts as live
+        // Only work checked on the web counts as live
         basis: input.basis === "web" && memory.browsed ? "web" : "knowledge",
       })
       memory.findings = [...(memory.findings ?? []), finding.id]

@@ -547,8 +547,8 @@ async function computerEvidence(ctx: RunContext, task: AgentTaskRecord) {
   const files = artifacts.filter((a) => a.kind === "image" || a.kind === "file")
   const lines = [
     pages.length
-      ? `Pages the agent actually opened on its computer:\n${pages.map((p) => `- ${p.url}`).join("\n")}`
-      : "The agent's computer log shows it did not open any web pages.",
+      ? `Pages the agent actually opened or got from a web search:\n${pages.map((p) => `- ${p.url}`).join("\n")}`
+      : "The agent's log shows it did not search the web or open any web pages.",
     files.length ? `Files it made and uploaded:\n${files.map((f) => `- ${f.name}: ${f.url}`).join("\n")}` : "It uploaded no files.",
   ]
   const newFindings = findings.filter((f) => f.createdAt >= since)

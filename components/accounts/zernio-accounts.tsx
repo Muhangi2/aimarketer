@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import type { SocialAccount } from "@/lib/integrations/types"
 import { PLATFORMS, POST_PLATFORMS, type PostPlatform } from "@/lib/posts/platforms"
+import { toast } from "@/components/ui/toast"
 
 // Why a connection didn't go through, from the codes Zernio sends back
 const CONNECT_ERRORS: Record<string, string> = {
@@ -175,6 +176,7 @@ export function ZernioAccounts({
                   setError(null)
                   const result = await disconnectZernioAccount(toRemove.id)
                   if (!result.ok) setError(result.error)
+                  else toast.add({ title: "Account disconnected", description: toRemove.username ? `@${toRemove.username}` : toRemove.fullname, type: "success" })
                   setToRemove(null)
                   router.refresh()
                 })

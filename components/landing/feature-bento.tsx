@@ -49,7 +49,7 @@ function Tile({
       transition={{ ...reveal.transition, delay }}
       onMouseMove={onMove}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-white p-2 transition-shadow duration-500 hover:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.18)]",
+        "group relative flex flex-col overflow-hidden rounded-[28px] border border-foreground/[0.06] bg-card p-2 transition-shadow duration-500 hover:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.18)]",
         className
       )}
     >
@@ -63,7 +63,7 @@ function Tile({
       </div>
       <div className="relative px-4 pt-5 pb-4">
         <h3 className="text-lg font-medium tracking-tight">{title}</h3>
-        <p className="mt-1.5 text-[15px] leading-relaxed text-slate-500">{body}</p>
+        <p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">{body}</p>
       </div>
     </motion.div>
   )
@@ -87,19 +87,19 @@ function InboxDemo() {
         <div
           key={m.from}
           className={cn(
-            "flex items-center gap-3 rounded-2xl border bg-white p-3 transition-all duration-500",
-            i === current ? "border-brand/40 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]" : "border-black/[0.05] opacity-60"
+            "flex items-center gap-3 rounded-2xl border bg-card p-3 transition-all duration-500",
+            i === current ? "border-brand/40 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]" : "border-foreground/[0.05] opacity-60"
           )}
         >
-          <span className="flex size-8 items-center justify-center rounded-full bg-ink text-white">
+          <span className="flex size-8 items-center justify-center rounded-full bg-foreground text-background">
             <PlatformIcon name={m.platform} size={14} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex justify-between text-xs">
               <span className="font-medium">{m.from}</span>
-              <span className="font-mono text-[10px] text-slate-400 uppercase">{platform(m.platform).name}</span>
+              <span className="font-mono text-[10px] text-muted-foreground/80 uppercase">{platform(m.platform).name}</span>
             </span>
-            <span className="block truncate text-[13px] text-slate-600">{m.text}</span>
+            <span className="block truncate text-[13px] text-muted-foreground">{m.text}</span>
           </span>
         </div>
       ))}
@@ -149,7 +149,7 @@ function PublishOrbit() {
               {/* Counter-rotate so the label stays upright while the ring turns */}
               <motion.span
                 title={platform(p).name}
-                className="flex size-10 items-center justify-center rounded-xl border border-black/[0.06] bg-white text-ink shadow-sm"
+                className="flex size-10 items-center justify-center rounded-xl border border-foreground/[0.06] bg-card text-ink shadow-sm"
                 animate={reduceMotion ? undefined : { rotate: -360 }}
                 transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
               >
@@ -159,7 +159,7 @@ function PublishOrbit() {
           )
         })}
       </motion.div>
-      <span className="relative scale-125 rounded-2xl bg-white p-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.18)]">
+      <span className="relative scale-125 rounded-2xl bg-card p-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.18)]">
         <Brand className="[&>span:last-child]:hidden" />
       </span>
     </div>
@@ -184,7 +184,7 @@ function VoiceDemo() {
             key={v.tone}
             className={cn(
               "rounded-full px-2.5 py-1 text-xs transition-colors duration-300",
-              v.tone === voice.tone ? "bg-brand text-white" : "bg-white text-slate-500"
+              v.tone === voice.tone ? "bg-brand text-white" : "bg-card text-muted-foreground"
             )}
           >
             {v.tone}
@@ -198,7 +198,7 @@ function VoiceDemo() {
           animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
           exit={{ opacity: 0, filter: "blur(6px)", y: -8 }}
           transition={{ duration: 0.45, ease }}
-          className="mt-4 rounded-2xl bg-white p-4 text-[15px] leading-snug shadow-sm"
+          className="mt-4 rounded-2xl bg-card p-4 text-[15px] leading-snug shadow-sm"
         >
           “{voice.text}”
         </motion.p>
@@ -216,12 +216,12 @@ function ApproveDemo() {
   return (
     <div ref={ref} className="w-full max-w-[260px] space-y-2">
       {DRAFTS.map((d, i) => (
-        <div key={d} className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 text-[13px] shadow-sm">
+        <div key={d} className="flex items-center justify-between rounded-xl bg-card px-3 py-2.5 text-[13px] shadow-sm">
           {d}
           <span
             className={cn(
               "flex size-5 items-center justify-center rounded-full transition-all duration-300",
-              i < approved ? "scale-100 bg-brand text-white" : "scale-90 border border-slate-200 text-transparent"
+              i < approved ? "scale-100 bg-brand text-white" : "scale-90 border border-border text-transparent"
             )}
           >
             <Check className="size-3" strokeWidth={3} />
@@ -235,17 +235,17 @@ function ApproveDemo() {
 function DesktopDemo() {
   const reduceMotion = useReducedMotion()
   return (
-    <div className="w-full max-w-[280px] overflow-hidden rounded-xl bg-white shadow-sm">
-      <div className="flex items-center gap-1.5 border-b border-black/[0.05] px-3 py-2">
-        <span className="size-2 rounded-full bg-slate-200" />
-        <span className="size-2 rounded-full bg-slate-200" />
-        <span className="ml-2 flex-1 truncate rounded-md bg-paper px-2 py-0.5 font-mono text-[10px] text-slate-500">
+    <div className="w-full max-w-[280px] overflow-hidden rounded-xl bg-card shadow-sm">
+      <div className="flex items-center gap-1.5 border-b border-foreground/[0.05] px-3 py-2">
+        <span className="size-2 rounded-full bg-muted-foreground/20" />
+        <span className="size-2 rounded-full bg-muted-foreground/20" />
+        <span className="ml-2 flex-1 truncate rounded-md bg-paper px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
           tiktok.com/discover
         </span>
       </div>
       <div className="relative grid h-36 grid-cols-3 gap-1.5 p-2">
         {Array.from({ length: 6 }, (_, i) => (
-          <span key={i} className={cn("rounded-md", i === 4 ? "bg-brand/25" : "bg-slate-100")} />
+          <span key={i} className={cn("rounded-md", i === 4 ? "bg-brand/25" : "bg-muted")} />
         ))}
         <motion.span
           className="absolute text-brand"
@@ -261,14 +261,14 @@ function DesktopDemo() {
 
 export function FeatureBento() {
   return (
-    <section id="features" data-nav-theme="light" className="scroll-mt-24 bg-paper px-5 py-28 text-ink sm:px-8 sm:py-36">
+    <section id="features" data-nav-theme="light" className="scroll-mt-24 bg-transparent px-5 py-28 text-ink sm:px-8 sm:py-36">
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           eyebrow="Features"
           title={
             <>
               Everything a marketing team does.{" "}
-              <span className="text-slate-400">In one calm place.</span>
+              <span className="text-muted-foreground/80">In one calm place.</span>
             </>
           }
         />

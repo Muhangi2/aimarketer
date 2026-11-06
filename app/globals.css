@@ -13,22 +13,22 @@
     --font-heading: var(--font-sans);
     --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
 
-    /* Brand palette: one blue (same as --primary) plus ink and paper neutrals.
-       Use these instead of one-off colours on the landing page and app screens. */
-    --color-brand: #2563eb;
-    --color-brand-bright: #3b82f6;
-    --color-brand-glow: #60a5fa;
-    --color-brand-deep: #1e3a8a;
-    --color-brand-wash: #eaf1ff;
-    /* Neutral charcoal greys (no blue tint) for dark sections and overlays */
-    --color-ink: #161618;
-    --color-ink-soft: #3a3b40;
-    /* Warm off-white bar and near-black text, as on claude.com */
-    --color-ivory: #faf9f5;
-    --color-charcoal: #141413;
-    /* Background of the dark page sections */
-    --color-night: #eef0f3;
-    --color-paper: #f7f8fa;
+    /* Brand palette. Every value is theme-aware (set in :root and .dark below),
+       so landing, auth and app screens all switch between light and dark together. */
+    --color-brand: var(--brand);
+    --color-brand-bright: var(--brand-bright);
+    --color-brand-glow: var(--brand-glow);
+    --color-brand-deep: var(--brand-deep);
+    --color-brand-wash: var(--brand-wash);
+    /* ink = strongest text; paper = page background; night = alternate section / panel background */
+    --color-ink: var(--foreground);
+    --color-ink-soft: var(--ink-soft);
+    --color-charcoal: var(--foreground);
+    --color-ivory: var(--card);
+    --color-night: var(--night);
+    --color-paper: var(--background);
+    /* Raised surface for chips that must stay dark in both themes (e.g. labels over photos) */
+    --color-scrim: var(--scrim);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -114,48 +114,68 @@
     --sidebar-accent-foreground: #161618;
     --sidebar-border: rgba(0, 0, 0, 0.06);
     --sidebar-ring: #2563eb;
+    --brand: #2563eb;
+    --brand-bright: #3b82f6;
+    --brand-glow: #60a5fa;
+    --brand-deep: #1e3a8a;
+    --brand-wash: #eaf1ff;
+    --ink-soft: #3a3b40;
+    --night: #eef0f3;
+    --scrim: #161618;
+    --shadow-color: 0 0 0;
 }
 
+/* Dark theme: neutral graphite surfaces that step up in lightness (page, panel, card, popover),
+   soft white text, and a slightly brighter blue so accents keep their contrast */
 .dark {
-    --background: oklch(0.129 0.042 264.695);
-    --foreground: oklch(0.984 0.003 247.858);
-    --card: oklch(0.208 0.042 265.755);
-    --card-foreground: oklch(0.984 0.003 247.858);
-    --popover: oklch(0.208 0.042 265.755);
-    --popover-foreground: oklch(0.984 0.003 247.858);
-    --primary: oklch(0.623 0.214 259.815);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.279 0.041 260.031);
-    --secondary-foreground: oklch(0.882 0.059 254.128);
-    --muted: oklch(0.279 0.041 260.031);
-    --muted-foreground: oklch(0.704 0.04 256.788);
-    --accent: oklch(0.282 0.091 267.935);
-    --accent-foreground: oklch(0.882 0.059 254.128);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.623 0.214 259.815);
-    --chart-1: oklch(0.623 0.214 259.815);
-    --chart-2: oklch(0.546 0.245 262.881);
-    --chart-3: oklch(0.488 0.243 264.376);
-    --chart-4: oklch(0.707 0.165 254.624);
-    --chart-5: oklch(0.809 0.105 251.813);
+    --background: #0e0f11;
+    --foreground: #ececee;
+    --card: #17181b;
+    --card-foreground: #ececee;
+    --popover: #1d1e22;
+    --popover-foreground: #ececee;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #222327;
+    --secondary-foreground: #ececee;
+    --muted: #222327;
+    --muted-foreground: #9a9ca3;
+    --accent: rgba(59, 130, 246, 0.16);
+    --accent-foreground: #bfdbfe;
+    --destructive: #f87171;
+    --border: rgba(255, 255, 255, 0.08);
+    --input: rgba(255, 255, 255, 0.14);
+    --ring: #3b82f6;
+    --chart-1: #3b82f6;
+    --chart-2: #93c5fd;
+    --chart-3: #60a5fa;
+    --chart-4: #1d4ed8;
+    --chart-5: #c7d2fe;
     --viz-1: #3987e5;
     --viz-2: #d95926;
     --viz-3: #199e70;
     --viz-4: #c98500;
     --viz-5: #d55181;
-    --viz-6: #008300;
+    --viz-6: #2fa52f;
     --viz-other: #8b8a85;
-    --viz-critical: #d03b3b;
-    --sidebar: oklch(0.208 0.042 265.755);
-    --sidebar-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-primary: oklch(0.623 0.214 259.815);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.279 0.041 260.031);
-    --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.623 0.214 259.815);
+    --viz-critical: #e05252;
+    --sidebar: #131416;
+    --sidebar-foreground: #ececee;
+    --sidebar-primary: #3b82f6;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #222327;
+    --sidebar-accent-foreground: #ececee;
+    --sidebar-border: rgba(255, 255, 255, 0.06);
+    --sidebar-ring: #3b82f6;
+    --brand: #3b82f6;
+    --brand-bright: #60a5fa;
+    --brand-glow: #93c5fd;
+    --brand-deep: #bfdbfe;
+    --brand-wash: rgba(59, 130, 246, 0.16);
+    --ink-soft: #2a2b30;
+    --night: #141518;
+    --scrim: #0b0c0e;
+    --shadow-color: 0 0 0;
 }
 
 @layer base {
@@ -165,6 +185,9 @@
   body {
     @apply bg-background text-foreground antialiased;
     }
+  /* Native controls (scrollbars, date pickers) follow the theme */
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
   html {
     @apply font-sans;
     scroll-behavior: smooth;
@@ -172,4 +195,62 @@
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
   }
+}
+
+/* Landing page backdrop: blueprint grid, slow aurora glow and film grain.
+   Dark mode uses a deep blue-black base; light mode keeps the paper base with a faint grid. */
+.landing {
+    --grid-line: rgba(15, 23, 42, 0.055);
+    --aurora-a: rgba(37, 99, 235, 0.07);
+    --aurora-b: rgba(255, 183, 134, 0.08);
+}
+.dark .landing {
+    --background: #10131a;
+    --night: #0b0e15;
+    --card: #191b23;
+    --popover: #191b23;
+    --muted: #1d2029;
+    --border: rgba(66, 71, 84, 0.7);
+    --grid-line: rgba(66, 71, 84, 0.22);
+    --aurora-a: rgba(173, 198, 255, 0.11);
+    --aurora-b: rgba(255, 183, 134, 0.06);
+}
+.landing-grid {
+    background-image:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+}
+.landing-aurora {
+    background:
+        radial-gradient(50% 40% at 30% 40%, var(--aurora-a), transparent 60%),
+        radial-gradient(40% 35% at 70% 60%, var(--aurora-b), transparent 60%);
+    animation: landing-aurora 16s ease-in-out infinite;
+}
+.landing-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.04;
+}
+@keyframes landing-aurora {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(4%, -3%, 0) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .landing-aurora { animation: none; }
+}
+
+/* Cursor light on the landing grid (position comes from components/landing/cursor-field.tsx) */
+.landing { --cursor-line: rgba(37, 99, 235, 0.3); }
+.dark .landing { --cursor-line: rgba(147, 197, 253, 0.32); }
+.cursor-grid {
+    background-image:
+        linear-gradient(to right, var(--cursor-line) 1px, transparent 1px),
+        linear-gradient(var(--cursor-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(260px circle at var(--cx) var(--cy), black, transparent 75%);
+}
+/* Smaller and quieter outside the hero */
+.cursor-field[data-mode="page"] .cursor-grid {
+    opacity: 0.6;
+    mask-image: radial-gradient(180px circle at var(--cx) var(--cy), black, transparent 75%);
 }

@@ -26,12 +26,7 @@ function curve(from: { x: number; y: number }, to: { x: number; y: number }) {
 
 export function AgentFlow() {
   return (
-    <section id="product" data-nav-theme="light" className="relative scroll-mt-24 overflow-hidden bg-paper px-5 py-28 text-ink sm:px-8 sm:py-36">
-      {/* Dotted grid fading toward the edges */}
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(circle,rgba(7,11,24,0.09)_1px,transparent_1px)] [mask-image:radial-gradient(60%_60%_at_50%_55%,black,transparent)] bg-[size:22px_22px]"
-      />
+    <section id="product" data-nav-theme="light" className="relative scroll-mt-24 overflow-hidden bg-transparent px-5 py-28 text-ink sm:px-8 sm:py-36">
       <div className="relative mx-auto max-w-7xl">
         <SectionHeading
           center
@@ -39,7 +34,7 @@ export function AgentFlow() {
           title={
             <>
               A month of content out.{" "}
-              <span className="text-slate-400">Without lifting a finger.</span>
+              <span className="text-muted-foreground/80">Without lifting a finger.</span>
             </>
           }
           body="Tell the Master Agent what you want to achieve. It breaks the goal into tasks, hands them to four specialists and keeps the whole campaign moving."
@@ -108,13 +103,13 @@ function FlowDiagram() {
         const Icon = agent.icon
         return (
           <Node key={agent.key} at={{ x: AGENT_X, y: ROWS[i] }} delay={0.7 + i * 0.1} inView={inView}>
-            <div className="flex w-[220px] items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_12px_32px_-16px_rgba(7,11,24,0.25)]">
+            <div className="flex w-[220px] items-center gap-3 rounded-2xl border border-foreground/[0.06] bg-card p-3 shadow-[0_12px_32px_-16px_rgba(7,11,24,0.25)]">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-wash text-brand">
                 <Icon className="size-[18px]" />
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{agent.name}</span>
-                <span className="block truncate text-xs text-slate-500">{agent.task}</span>
+                <span className="block truncate text-xs text-muted-foreground">{agent.task}</span>
               </span>
             </div>
           </Node>
@@ -164,18 +159,18 @@ function GoalCard({ active }: { active: boolean }) {
   }, [active])
 
   return (
-    <div className="w-[260px] rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_20px_50px_-20px_rgba(7,11,24,0.3)]">
-      <p className="font-mono text-[10px] tracking-wider text-slate-400 uppercase">Your goal</p>
+    <div className="w-[260px] rounded-2xl border border-foreground/[0.06] bg-card p-4 shadow-[0_20px_50px_-20px_rgba(7,11,24,0.3)]">
+      <p className="font-mono text-[10px] tracking-wider text-muted-foreground/80 uppercase">Your goal</p>
       <p className="mt-2 min-h-[2.75rem] text-[15px] leading-snug font-medium">
         {GOAL_TEXT.slice(0, typed)}
         <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-brand" />
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="rounded-full bg-paper px-2 py-0.5 font-mono text-[10px] text-slate-500">Brewline Coffee</span>
+        <span className="rounded-full bg-paper px-2 py-0.5 font-mono text-[10px] text-muted-foreground">Brewline Coffee</span>
         <span
           className={cn(
             "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-500",
-            typed >= GOAL_TEXT.length ? "bg-brand text-white" : "bg-slate-100 text-slate-400"
+            typed >= GOAL_TEXT.length ? "bg-brand text-white" : "bg-muted text-muted-foreground/80"
           )}
         >
           Launch
@@ -202,19 +197,19 @@ function MasterOrb() {
         </span>
       </div>
       <p className="mt-2 text-sm font-medium">Master Agent</p>
-      <p className="font-mono text-[10px] text-slate-400 uppercase">12 tasks planned</p>
+      <p className="font-mono text-[10px] text-muted-foreground/80 uppercase">12 tasks planned</p>
     </div>
   )
 }
 
 const outputCard =
-  "w-[230px] rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_12px_32px_-16px_rgba(7,11,24,0.25)]"
+  "w-[230px] rounded-2xl border border-foreground/[0.06] bg-card p-3 shadow-[0_12px_32px_-16px_rgba(7,11,24,0.25)]"
 
 const OUTPUTS = [
   function Trends() {
     return (
       <div className={outputCard}>
-        <p className="font-mono text-[10px] text-slate-400 uppercase">6 trends found</p>
+        <p className="font-mono text-[10px] text-muted-foreground/80 uppercase">6 trends found</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {["#SlowMorning", "Latte art", "Home brew"].map((t) => (
             <span key={t} className="rounded-full bg-brand-wash px-2 py-0.5 text-[11px] text-brand">
@@ -232,7 +227,7 @@ const OUTPUTS = [
         <img src={unsplash("1495474472287-4d71bcdd2085", 120)} alt="" className="size-12 rounded-lg object-cover" />
         <div className="min-w-0">
           <p className="truncate text-xs font-medium">Monday, sorted ☕️</p>
-          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
             <Heart className="size-3" /> Carousel · 5 slides
           </p>
         </div>
@@ -247,7 +242,7 @@ const OUTPUTS = [
         </span>
         <div>
           <p className="text-xs font-medium">Tue · 6:00 PM</p>
-          <p className="text-[11px] text-slate-500">TikTok, Instagram, LinkedIn +3</p>
+          <p className="text-[11px] text-muted-foreground">TikTok, Instagram, LinkedIn +3</p>
         </div>
       </div>
     )
@@ -256,7 +251,7 @@ const OUTPUTS = [
     return (
       <div className={outputCard}>
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] text-slate-400 uppercase">Reach this week</p>
+          <p className="font-mono text-[10px] text-muted-foreground/80 uppercase">Reach this week</p>
           <span className="inline-flex items-center gap-1 text-xs font-medium text-brand">
             <TrendingUp className="size-3" /> +38%
           </span>
@@ -284,7 +279,7 @@ function FlowList() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: i * 0.08, ease }}
             className={cn(
-              "flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-3",
+              "flex items-center gap-3 rounded-2xl border border-foreground/[0.06] bg-card p-3",
               i > 0 && "ml-6"
             )}
           >
@@ -298,7 +293,7 @@ function FlowList() {
             </span>
             <span>
               <span className="block text-sm font-medium">{agent.name}</span>
-              <span className="block text-xs text-slate-500">{agent.task}</span>
+              <span className="block text-xs text-muted-foreground">{agent.task}</span>
             </span>
           </motion.div>
         )

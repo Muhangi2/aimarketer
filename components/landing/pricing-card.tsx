@@ -67,7 +67,7 @@ export function PricingCard() {
   const [userCount, setUserCount] = useState(3);
 
   return (
-    <div className="w-full max-w-[450px] flex flex-col gap-6 p-5 px-4 sm:p-6 rounded-[28px] border border-white/20 bg-white shadow-[0_40px_100px_-40px_rgba(0,0,0,0.7)] transition-colors duration-300 not-prose">
+    <div className="w-full max-w-[450px] flex flex-col gap-6 p-5 px-4 sm:p-6 rounded-[28px] border border-white/20 bg-card shadow-[0_40px_100px_-40px_rgba(0,0,0,0.7)] transition-colors duration-300 not-prose">
       <div className="flex flex-col gap-4 mb-2">
         <h1 className="text-2xl font-semibold text-foreground tracking-tight">
           Pick your plan

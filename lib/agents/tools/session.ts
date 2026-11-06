@@ -31,9 +31,11 @@ export type RunMemory = {
   drafts?: string[]
   // Permanent URLs of images made or uploaded this attempt, so a forgotten draft still gets them
   images?: string[]
+  // Permanent URLs of videos made this attempt (make_video)
+  videos?: string[]
 }
 
-export const newMemory = (): RunMemory => ({ actions: 0, uploads: {}, browsed: false, findings: [], drafts: [], images: [] })
+export const newMemory = (): RunMemory => ({ actions: 0, uploads: {}, browsed: false, findings: [], drafts: [], images: [], videos: [] })
 
 export type Session = {
   // Started on first use: work from the agent's own knowledge never boots a desktop

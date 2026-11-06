@@ -56,7 +56,9 @@ async function ensureSaved(session: Session, memory: RunMemory, report: { summar
       memory.findings = [finding.id]
     }
     const images = [...new Set(memory.images ?? [])]
-    if (session.agentKey === "creator" && !memory.drafts?.length && (report.details.trim() || images.length > 0)) {
+    // A post has images or one video: the newest video wins
+    const video = memory.videos?.at(-1)
+    if (session.agentKey === "creator" && !memory.drafts?.length && (report.details.trim() || images.length > 0 || video)) {
       const body = report.details.trim() || report.summary.trim()
       const draft = await session.outputs.addDraft({
         requestId: task.requestId,
@@ -66,7 +68,7 @@ async function ensureSaved(session: Session, memory: RunMemory, report: { summar
         title: task.title,
         body,
         hashtags: body.match(/#[\p{L}\p{N}_]+/gu) ?? [],
-        imageUrls: images.slice(0, 20),
+        imageUrls: video ? [video] : images.slice(0, 20),
         notes: "Saved automatically from the agent's final report.",
       })
       memory.drafts = [draft.id]

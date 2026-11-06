@@ -7,7 +7,7 @@ import { TREND_METRICS, type AnalyticsReport, type TrendMetric } from "@/lib/ana
 import { platformColor, platformLabel } from "@/lib/analytics/types"
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart"
 import { PlatformIcon } from "@/components/posts/platform-icon"
-import { ChartCard, ChartEmpty, Segmented, TooltipCard, formatCompact, formatDay, formatFull, formatSpan } from "@/components/analytics/parts"
+import { ChartCard, ChartEmpty, Segmented, TooltipCard, formatAxis, formatCompact, formatDay, formatFull, formatSpan } from "@/components/analytics/parts"
 
 /*
  * The Analytics page's charts. Colors: the validated categorical slots (--viz-*) follow each
@@ -60,7 +60,7 @@ export function TrendChart({ report, hasMetrics }: { report: AnalyticsReport; ha
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="key" {...axisProps} minTickGap={28} tickFormatter={formatDay} />
-            <YAxis {...axisProps} width={44} tickFormatter={(v: number) => formatCompact(v)} allowDecimals={false} />
+            <YAxis {...axisProps} width={44} tickFormatter={(v: number) => formatAxis(v)} allowDecimals={false} />
             <ChartTooltip
               cursor={{ strokeWidth: 1 }}
               content={({ active, payload }: TooltipProps) => {

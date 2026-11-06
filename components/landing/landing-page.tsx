@@ -8,6 +8,7 @@ import { cn } from "cn"
 import { Brand } from "@/components/brand"
 import type { OfficeScene } from "@/lib/office-scene"
 import { AgentFlow } from "./agent-flow"
+import { CursorField } from "./cursor-field"
 import { FeatureBento } from "./feature-bento"
 import { FocusTestimonials } from "./focus-testimonials"
 import { Hero } from "./hero"
@@ -22,7 +23,14 @@ import { NAV_ITEMS, SiteHeader } from "./site-header"
 // ink pricing, paper FAQ, ink close
 export function LandingPage({ scene }: { scene: OfficeScene }) {
   return (
-    <div className="min-h-svh bg-paper text-ink antialiased selection:bg-brand selection:text-white">
+    <div className="landing relative isolate min-h-svh bg-paper text-ink antialiased selection:bg-brand selection:text-white">
+      {/* Fixed backdrop behind every section: grid, drifting aurora, grain */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="landing-aurora absolute -inset-[10%] opacity-60" />
+        <div className="landing-grid absolute inset-0" />
+        <div className="landing-grain absolute inset-0" />
+      </div>
+      <CursorField />
       <SiteHeader />
       <main>
         <Hero />
@@ -43,13 +51,13 @@ export function LandingPage({ scene }: { scene: OfficeScene }) {
 
 function Reviews() {
   return (
-    <section id="reviews" data-nav-theme="light" className="scroll-mt-24 bg-paper px-5 pb-28 sm:px-8 sm:pb-36">
+    <section id="reviews" data-nav-theme="light" className="scroll-mt-24 bg-transparent px-5 pb-28 sm:px-8 sm:pb-36">
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           eyebrow="Loved by small teams"
           title={
             <>
-              They handed social over. <span className="text-slate-400">Here is how it went.</span>
+              They handed social over. <span className="text-muted-foreground/80">Here is how it went.</span>
             </>
           }
         />
@@ -71,7 +79,7 @@ const INCLUDED = [
 
 function Pricing() {
   return (
-    <section id="pricing" className="relative scroll-mt-24 overflow-hidden bg-night px-5 py-28 text-ink sm:px-8 sm:py-36">
+    <section id="pricing" className="relative scroll-mt-24 overflow-hidden bg-night/55 px-5 py-28 text-ink sm:px-8 sm:py-36">
       <div className="relative mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2 lg:gap-24">
         <div>
           <SectionHeading
@@ -129,14 +137,14 @@ function Faq() {
   const [open, setOpen] = useState(0)
 
   return (
-    <section id="faq" data-nav-theme="light" className="scroll-mt-24 bg-paper px-5 py-28 sm:px-8 sm:py-36">
+    <section id="faq" data-nav-theme="light" className="scroll-mt-24 bg-transparent px-5 py-28 sm:px-8 sm:py-36">
       <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-24">
         <SectionHeading
           eyebrow="FAQ"
           title="Questions, answered."
           body="Anything else? Our team replies within a day, and your agents never sleep."
         />
-        <motion.div {...reveal} className="divide-y divide-black/[0.07] border-y border-black/[0.07]">
+        <motion.div {...reveal} className="divide-y divide-foreground/[0.07] border-y border-foreground/[0.07]">
           {FAQS.map((item, i) => (
             <div key={item.q}>
               <button
@@ -149,7 +157,7 @@ function Faq() {
                 <span
                   className={cn(
                     "flex size-8 shrink-0 items-center justify-center rounded-full border transition-all duration-300",
-                    open === i ? "rotate-45 border-brand bg-brand text-white" : "border-black/10 text-slate-500"
+                    open === i ? "rotate-45 border-brand bg-brand text-white" : "border-foreground/10 text-muted-foreground"
                   )}
                 >
                   <Plus className="size-4" />
@@ -164,7 +172,7 @@ function Faq() {
                     transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     className="overflow-hidden"
                   >
-                    <p className="max-w-xl pb-6 text-[15px] leading-relaxed text-slate-600">{item.a}</p>
+                    <p className="max-w-xl pb-6 text-[15px] leading-relaxed text-muted-foreground">{item.a}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -179,7 +187,7 @@ function Faq() {
 // Solid brand panel: no photos or tint, just the message and one button
 function FinalCta() {
   return (
-    <section className="bg-night px-3 pt-3 sm:px-4 sm:pt-4">
+    <section className="bg-night/55 px-3 pt-3 sm:px-4 sm:pt-4">
       <div className="relative overflow-hidden rounded-[32px] bg-brand px-6 py-28 text-center text-white sm:py-36">
         <motion.div {...reveal}>
           <p className="font-mono text-[11px] tracking-[0.14em] text-white/70 uppercase">Ready when you are</p>
@@ -234,7 +242,7 @@ function SiteFooter() {
             </div>
           </div>
         </div>
-        <div className="mt-16 flex items-center justify-between border-t border-black/12 py-6 font-mono text-[11px] text-ink/55 uppercase">
+        <div className="mt-16 flex items-center justify-between border-t border-foreground/12 py-6 font-mono text-[11px] text-ink/55 uppercase">
           <span>© {new Date().getFullYear()} Hively</span>
           <span>Made with agents</span>
         </div>
@@ -246,7 +254,7 @@ function SiteFooter() {
         whileInView={{ y: "0%", opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        className="pointer-events-none mx-auto -mb-[0.2em] max-w-7xl bg-linear-to-b from-black/[0.1] to-transparent bg-clip-text text-center text-[clamp(4rem,16vw,15rem)] leading-none font-semibold tracking-[-0.06em] whitespace-nowrap text-transparent select-none"
+        className="pointer-events-none mx-auto -mb-[0.2em] max-w-7xl bg-linear-to-b from-foreground/[0.1] to-transparent bg-clip-text text-center text-[clamp(4rem,16vw,15rem)] leading-none font-semibold tracking-[-0.06em] whitespace-nowrap text-transparent select-none"
       >
         Hively
       </motion.p>

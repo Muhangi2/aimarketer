@@ -41,6 +41,7 @@ import { thumbUrl } from "@/lib/posts/client"
 import { PLATFORMS, isPostPlatform } from "@/lib/posts/platforms"
 import { formatInZone } from "@/lib/posts/time"
 import { isEditablePost, type PostRecord, type PostStatus } from "@/lib/posts/types"
+import { toast } from "@/components/ui/toast"
 
 const STATUS_STYLE: Record<PostStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-500/12 text-slate-700 dark:text-slate-300" },
@@ -261,6 +262,7 @@ export function PostsBoard({ posts, highlightId }: { posts: PostRecord[]; highli
         return
       }
       setToDelete(null)
+      toast.add({ title: "Post deleted", type: "success" })
       router.refresh()
     })
   }

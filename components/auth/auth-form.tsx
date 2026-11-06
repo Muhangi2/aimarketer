@@ -37,7 +37,7 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
         <h1 className="text-[2rem] leading-tight font-medium tracking-[-0.035em]">
           {isSignUp ? "Create your account" : "Welcome back"}
         </h1>
-        <p className="mt-2 text-[15px] text-slate-500">
+        <p className="mt-2 text-[15px] text-muted-foreground">
           {isSignUp
             ? "Hire your AI marketing team in about ten minutes."
             : "Sign in to continue to your campaigns."}
@@ -48,17 +48,17 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
         <GoogleButton />
       </form>
 
-      <div className="flex items-center gap-3 text-xs text-slate-400">
-        <span className="h-px flex-1 bg-black/10" />
+      <div className="flex items-center gap-3 text-xs text-muted-foreground/80">
+        <span className="h-px flex-1 bg-foreground/10" />
         or continue with email
-        <span className="h-px flex-1 bg-black/10" />
+        <span className="h-px flex-1 bg-foreground/10" />
       </div>
 
       <form action={formAction} className="flex flex-col gap-4">
         {isSignUp && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="name">Full name</Label>
-            <Input id="name" name="name" autoComplete="name" placeholder="Jane Doe" className="h-11 rounded-xl border-black/12 bg-white px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20" />
+            <Input id="name" name="name" autoComplete="name" placeholder="Jane Doe" className="h-11 rounded-xl border-foreground/12 bg-card px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20" />
           </div>
         )}
         <div className="flex flex-col gap-1.5">
@@ -69,7 +69,7 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
             type="email"
             autoComplete="email"
             placeholder="you@company.com"
-            className="h-11 rounded-xl border-black/12 bg-white px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20"
+            className="h-11 rounded-xl border-foreground/12 bg-card px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20"
             required
           />
         </div>
@@ -81,7 +81,7 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
             type="password"
             autoComplete={isSignUp ? "new-password" : "current-password"}
             placeholder={isSignUp ? "At least 6 characters" : "••••••••"}
-            className="h-11 rounded-xl border-black/12 bg-white px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20"
+            className="h-11 rounded-xl border-foreground/12 bg-card px-3.5 text-[15px] focus-visible:border-brand focus-visible:ring-brand/20"
             minLength={6}
             required
           />
@@ -97,7 +97,7 @@ export function AuthForm({ mode, initialError }: { mode: Mode; initialError?: st
         </Button>
       </form>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-muted-foreground">
         {isSignUp ? "Already have an account? " : "New to Hively? "}
         <Link
           href={isSignUp ? "/sign-in" : "/sign-up"}
@@ -129,7 +129,7 @@ function VerifyEmailForm({ email, message }: { email: string; message?: string }
       </span>
       <div>
         <h1 className="text-[2rem] leading-tight font-medium tracking-[-0.035em]">Check your email</h1>
-        <p className="mt-2 text-[15px] text-slate-500">
+        <p className="mt-2 text-[15px] text-muted-foreground">
           {info ?? `Enter the 6-digit code sent to ${email}.`}
         </p>
       </div>
@@ -153,7 +153,7 @@ function VerifyEmailForm({ email, message }: { email: string; message?: string }
         </Button>
       </form>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-muted-foreground">
         Didn&apos;t get it?{" "}
         <button
           type="button"
@@ -170,7 +170,7 @@ function VerifyEmailForm({ email, message }: { email: string; message?: string }
 
 function GoogleButton() {
   return (
-    <Button type="submit" variant="outline" className="h-11 w-full rounded-full border-black/15 bg-white text-[15px] hover:bg-black/[0.03]">
+    <Button type="submit" variant="outline" className="h-11 w-full rounded-full border-foreground/15 bg-card text-[15px] hover:bg-foreground/[0.03]">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z" />
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />

@@ -39,7 +39,7 @@ const POSTS: Post[] = [
 
 function PlatformTag({ name, light }: { name: PlatformKey; light?: boolean }) {
   return (
-    <span className={cn("ml-auto inline-flex items-center gap-1 text-[10px] font-medium", light ? "text-white" : "text-slate-500")}>
+    <span className={cn("ml-auto inline-flex items-center gap-1 text-[10px] font-medium", light ? "text-white" : "text-muted-foreground")}>
       <PlatformIcon name={name} size={11} />
       {platform(name).name}
     </span>
@@ -51,7 +51,7 @@ function BadgeChip({ badge }: { badge: Badge }) {
     <span
       className={cn(
         "absolute top-2 left-2 z-10 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium",
-        badge.kind === "scheduled" ? "bg-brand text-white" : "bg-white text-brand"
+        badge.kind === "scheduled" ? "bg-brand text-white" : "bg-card text-brand"
       )}
     >
       {badge.kind === "scheduled" ? <CalendarClock className="size-3" /> : <Sparkles className="size-3" />}
@@ -69,7 +69,7 @@ function Img({ id, className }: { id: string; className?: string }) {
   return <img src={unsplash(id, 420)} alt="" decoding="async" className={cn("size-full object-cover", className)} />
 }
 
-const card = "relative overflow-hidden rounded-[18px] border border-white/10 bg-white text-slate-900 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)]"
+const card = "relative overflow-hidden rounded-[18px] border border-white/10 bg-card text-foreground shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)]"
 
 function PostCard({ post }: { post: Post }) {
   if (post.format === "vertical") {
@@ -110,7 +110,7 @@ function PostCard({ post }: { post: Post }) {
           <Avatar />
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-[11px] leading-snug font-semibold">{post.title}</p>
-            <p className="mt-0.5 flex items-center text-[10px] text-slate-500">
+            <p className="mt-0.5 flex items-center text-[10px] text-muted-foreground">
               {post.handle} · {post.meta}
             </p>
           </div>
@@ -129,7 +129,7 @@ function PostCard({ post }: { post: Post }) {
           <Avatar />
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-[11px] font-semibold">{post.name}</span>
-            <span className="block truncate text-[10px] text-slate-400">@{post.handle}</span>
+            <span className="block truncate text-[10px] text-muted-foreground/80">@{post.handle}</span>
           </span>
           <PlatformTag name={post.platform} />
         </div>
@@ -144,7 +144,7 @@ function PostCard({ post }: { post: Post }) {
             <Sparkles className="size-3" /> {post.badge.label}
           </span>
         )}
-        <div className="mt-2.5 flex items-center gap-4 text-[10px] text-slate-500">
+        <div className="mt-2.5 flex items-center gap-4 text-[10px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <MessageCircle className="size-3" /> {post.text.length}
           </span>
@@ -166,12 +166,12 @@ function PostCard({ post }: { post: Post }) {
         <span className="truncate text-[11px] font-semibold">{post.handle}</span>
         <PlatformTag name={post.platform} />
       </div>
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-100">
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
         <Img id={post.image} />
         {post.badge && <BadgeChip badge={post.badge} />}
       </div>
-      <p className="mt-2 line-clamp-2 px-1 text-[11px] leading-snug text-slate-600">{post.caption}</p>
-      <div className="mt-2 flex items-center gap-3 px-1 pb-1 text-[10px] text-slate-500">
+      <p className="mt-2 line-clamp-2 px-1 text-[11px] leading-snug text-muted-foreground">{post.caption}</p>
+      <div className="mt-2 flex items-center gap-3 px-1 pb-1 text-[10px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <Heart className="size-3" /> {post.likes}
         </span>
