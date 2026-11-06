@@ -23,7 +23,8 @@ import {
   type Session,
 } from "@/lib/agents/tools"
 import type { AgentTaskRecord } from "@/lib/agents/types"
-import { SCREEN } from "@/lib/computers/desktop"
+import { SCREEN, computersConfigured } from "@/lib/computers/desktop"
+import { textSearchAvailable } from "@/lib/search/web"
 import type { ComputerStore } from "@/lib/computers/store"
 
 /*
@@ -66,8 +67,15 @@ const TEAM = `You are one of four AI agents on a social media marketing team, co
 - Analytics Agent: metrics, performance analysis and recommendations`
 
 // Small models follow short, concrete rules best: every rule here maps to a tool they have
-const BROWSER_RULES = `Using the browser:
-- web_search opens a search page and shows you a screenshot. computer does one action at a time: {"action": "click", "x": 300, "y": 200}. Look at the new screenshot before the next action. Coordinates are pixels from the top-left.
+const QUICK_SEARCH_RULE = `- Use quick_search first: it returns text results in seconds. Use the browser (web_search, computer) only to see a page quick_search can't show you, like a profile's latest posts, or when quick_search finds nothing useful.`
+
+function browserRules() {
+  return `Using the browser:
+${textSearchAvailable() ? `${QUICK_SEARCH_RULE}
+` : ""}${BROWSER_STEPS}`
+}
+
+const BROWSER_STEPS = `- web_search opens a search page and shows you a screenshot. computer does one action at a time: {"action": "click", "x": 300, "y": 200}. Look at the new screenshot before the next action. Coordinates are pixels from the top-left.
 - Go straight to pages (web_search, or computer with {"action": "open_url", "url": "https://..."}). Keep browsing short.
 - If a page asks you to log in, solve a captcha or verify anything, call ask_user_for_help. The user logs in themselves. Never type, ask for or store passwords or codes.
 - Never post, comment, like, follow, message, buy or change settings unless the task says so.`
@@ -87,11 +95,13 @@ function researchPrompt(browse: boolean) {
 1. Start from your own knowledge. Timeless topics (audience psychology, formats, evergreen ideas) need no browser.
 2. Use the browser for live or in-depth information: what is trending now, current hashtags, recent news, a competitor's latest posts, platform changes, or anything you're unsure is still true.`
     : `How to work: answer from your own knowledge. You have no browser for this task.`
+  const quick = browse && textSearchAvailable()
   const tools = [
+    quick && `- quick_search: fast text web search (titles, links, snippets). Your first choice for trends, hashtags, news and facts to check.`,
     browse && `- web_search: search google, google_news, google_trends, youtube, instagram, tiktok, x, linkedin, facebook, reddit, pinterest, or web (one site).`,
     browse && `- read_page: the text of an article or blog post, without scrolling. For Instagram, TikTok and X, look at the page with computer instead.`,
     browse && `- computer: click, scroll, type and look at pages.`,
-    `- save_research_finding: save each useful finding as its own record, 3-10 per task, with source URLs. basis "web" only for things you checked in the browser.`,
+    `- save_research_finding: save each useful finding as its own record, 3-10 per task, with source URLs. basis "web" only for things you checked on the web this task.`,
     browse && `- ask_user_for_help: a site needs the user to log in.`,
   ].filter(Boolean)
   return `${how}
@@ -107,7 +117,10 @@ function creatorPrompt(browse: boolean) {
     `- write_copy: drafts posts, captions, threads, carousels, video scripts, stories, hashtag sets or content ideas, in variations. Pick and refine the best.`,
     `- generate_image: a new image from a detailed prompt: subject, style, colors, composition, any text. Never real, identifiable people.`,
     `- edit_image: change an image with ImageKit AI: remove_background, change_background, edit, generate_variation, retouch, upscale, drop_shadow, extend, smart_crop, face_crop, platform_size or add_text.`,
-    `- save_content_draft: save every finished piece as a draft with its hashtags and image URLs. Make the images first, then save the draft.`,
+    computersConfigured() &&
+      `- make_video: turns 1-10 images into an MP4 slideshow (zoom, crossfades, on-screen captions) for Reels, TikTok and Shorts. For a video: write the script, make one 9:16 image per scene, then make_video with a short caption per scene.`,
+    `- save_content_draft: save every finished piece as a draft with its hashtags and image URLs (or video_url for a video). Make the images or video first, then save the draft.`,
+    browse && textSearchAvailable() && `- quick_search: fast text web search for something current, like popular hashtags.`,
     browse && `- web_search, computer: look at a reference or check something current.`,
     browse && `- ask_user_for_help: a site needs the user to log in.`,
   ].filter(Boolean)
@@ -127,7 +140,7 @@ ${TEAM}
 The Master Agent gave you a task for the campaign "${campaignName}".${browse ? ` You have your own cloud computer with a web browser (screen ${SCREEN.width}x${SCREEN.height}); it starts the first time you use it.` : ""}
 
 ${agentKey === "research" ? researchPrompt(browse) : creatorPrompt(browse)}
-${browse ? `\n${BROWSER_RULES}\n` : ""}
+${browse ? `\n${browserRules()}\n` : ""}
 ${SHARED_RULES}`
 }
 

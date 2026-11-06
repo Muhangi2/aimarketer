@@ -22,7 +22,7 @@ export function OfficeReveal({ scene }: { scene: OfficeScene }) {
   const calloutOpacity = useTransform(scrollYProgress, [0.75, 1], [0, 1])
 
   return (
-    <section className="relative overflow-hidden bg-night px-5 pt-16 pb-32 text-ink sm:px-8">
+    <section className="relative overflow-hidden bg-night/55 px-5 pt-16 pb-32 text-ink sm:px-8">
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           center
@@ -39,7 +39,7 @@ export function OfficeReveal({ scene }: { scene: OfficeScene }) {
           <motion.div style={{ scale, rotateX: tilt }} className="relative mx-auto max-w-6xl origin-top">
             <motion.div
               style={{ borderRadius: radius }}
-              className="overflow-hidden border border-black/15 bg-black/[0.04] p-2 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]"
+              className="overflow-hidden border border-foreground/15 bg-foreground/[0.04] p-2 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]"
             >
               <motion.div style={{ borderRadius: radius }} className="overflow-hidden">
                 <AgentOffice scene={scene} />
@@ -50,7 +50,7 @@ export function OfficeReveal({ scene }: { scene: OfficeScene }) {
               <motion.div
                 key={title}
                 style={{ opacity: calloutOpacity }}
-                className={`absolute hidden items-center gap-3 rounded-2xl border border-white/10 bg-ink/85 p-3 pr-4 text-white shadow-2xl backdrop-blur-xl md:flex ${className}`}
+                className={`absolute hidden items-center gap-3 rounded-2xl border border-white/10 bg-scrim/90 p-3 pr-4 text-white shadow-2xl backdrop-blur-xl md:flex ${className}`}
               >
                 <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-white">
                   <Icon className="size-4" />

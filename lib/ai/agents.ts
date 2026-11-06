@@ -37,7 +37,7 @@ Not yours: writing finished captions (Creator), planning dates/times (Scheduler)
   },
   creator: {
     name: "Creator Agent",
-    summary: "captions, hooks, threads, carousel text, video scripts, hashtags and calls to action",
+    summary: "captions, hooks, threads, carousel text, video scripts, slideshow videos, hashtags and calls to action",
     instructions: `You are the Creator Agent, responsible for content creation.
 Your responsibilities:
 - Write ready-to-post captions, hooks, threads, carousel slide text and short video scripts.

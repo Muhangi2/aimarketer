@@ -18,14 +18,14 @@ const FACTS = [
 // Light, clean hero: copy on the left, a framed live feed on the right. No tints or overlays
 export function Hero() {
   return (
-    <section className="relative bg-paper text-ink">
+    <section data-cursor="hero" className="relative bg-transparent text-ink">
       <div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-5 pt-32 pb-16 sm:px-8 lg:min-h-[100svh] lg:grid-cols-[0.9fr_1.1fr] lg:pt-28 lg:pb-10">
         <div>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease }}
-            className="inline-flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pr-3.5 pl-2 text-sm text-slate-600"
+            className="inline-flex items-center gap-2.5 rounded-full border border-foreground/10 bg-card py-1.5 pr-3.5 pl-2 text-sm text-muted-foreground"
           >
             <span className="rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] tracking-wider text-white uppercase">
               New
@@ -58,7 +58,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.75, ease }}
-            className="mt-7 max-w-lg text-lg leading-relaxed text-slate-600"
+            className="mt-7 max-w-lg text-lg leading-relaxed text-muted-foreground"
           >
             Five AI agents research trends, write posts in your voice, publish them at the right moment and report back.
             You approve, they do the rest.
@@ -73,7 +73,7 @@ export function Hero() {
             <PrimaryButton href="/sign-up">Hire your AI team</PrimaryButton>
             <a
               href="#how-it-works"
-              className="inline-flex h-12 items-center rounded-full border border-black/15 bg-white px-6 font-medium text-ink transition-colors hover:bg-black/[0.03]"
+              className="inline-flex h-12 items-center rounded-full border border-foreground/15 bg-card px-6 font-medium text-ink transition-colors hover:bg-foreground/[0.03]"
             >
               See how it works
             </a>
@@ -83,12 +83,12 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 1.1 }}
-            className="mt-14 grid max-w-xl grid-cols-2 gap-x-8 gap-y-6 border-t border-black/10 pt-8 sm:grid-cols-4"
+            className="mt-14 grid max-w-xl grid-cols-2 gap-x-8 gap-y-6 border-t border-foreground/10 pt-8 sm:grid-cols-4"
           >
             {FACTS.map((fact) => (
               <div key={fact.label}>
                 <dt className="text-2xl font-medium tracking-tight">{fact.value}</dt>
-                <dd className="mt-1 text-xs leading-snug text-slate-500">{fact.label}</dd>
+                <dd className="mt-1 text-xs leading-snug text-muted-foreground">{fact.label}</dd>
               </div>
             ))}
           </motion.dl>
@@ -99,7 +99,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.4, ease }}
-          className="relative h-[460px] overflow-hidden rounded-[32px] border border-black/[0.06] bg-night sm:h-[600px] lg:h-[760px]"
+          className="relative h-[460px] overflow-hidden rounded-[32px] border border-foreground/[0.06] bg-night sm:h-[600px] lg:h-[760px]"
         >
           <FeedWall
             tilted={false}

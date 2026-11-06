@@ -11,8 +11,11 @@ export function AgentOfficePanel({
   onSelectSeat,
   pausedSeatIds,
   seatStatus,
+  fill = true,
 }: {
   scene: OfficeScene
+  // Stretch the office to the panel's height on large screens; off keeps its natural shape
+  fill?: boolean
   className?: string
   selectedSeatId?: string | null
   onSelectSeat?: (seatId: string) => void
@@ -46,7 +49,7 @@ export function AgentOfficePanel({
         onSelectSeat={onSelectSeat}
         pausedSeatIds={pausedSeatIds}
         seatStatus={seatStatus}
-        className="lg:aspect-auto lg:min-h-0 lg:flex-1"
+        className={fill ? "lg:aspect-auto lg:min-h-0 lg:flex-1" : undefined}
       />
     </section>
   )

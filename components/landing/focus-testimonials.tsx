@@ -107,7 +107,7 @@ const TestimonialSpanItem = memo(function TestimonialSpanItem({
   onHover: (id: number) => void;
 }) {
   const stateClass = !hasHover
-    ? "opacity-100 blur-0 text-slate-700"
+    ? "opacity-100 blur-0 text-foreground/80"
     : isHovered
     ? "opacity-100 blur-0 text-foreground"
     : "opacity-30 blur-[2.8px] text-muted-foreground";
@@ -203,7 +203,7 @@ export function FocusTestimonials() {
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative z-10 flex w-full max-w-[1400px] flex-col rounded-[32px] border border-black/[0.06] bg-white p-6 text-ink shadow-[0_30px_80px_-40px_rgba(7,11,24,0.25)] transition-all sm:p-10 md:p-16"
+        className="relative z-10 flex w-full max-w-[1400px] flex-col rounded-[32px] border border-foreground/[0.06] bg-card p-6 text-ink shadow-[0_30px_80px_-40px_rgba(7,11,24,0.25)] transition-all sm:p-10 md:p-16"
       >
         <AnimatePresence>
           {activeItem && (
@@ -243,7 +243,7 @@ export function FocusTestimonials() {
                 <span className="text-xs sm:text-sm font-semibold tracking-tight text-white whitespace-nowrap">
                   {activeItem.author}
                 </span>
-                <span className="text-[10px] sm:text-xs font-normal text-slate-300 whitespace-nowrap">
+                <span className="text-[10px] sm:text-xs font-normal text-muted-foreground/60 whitespace-nowrap">
                   {activeItem.role} ·{" "}
                   <span className="font-medium text-white">
                     {activeItem.company}

@@ -10,8 +10,13 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+// Sidebar sections, in display order
+export const NAV_GROUPS = ["Workspace", "Content", "Insights", "Manage"] as const
+export type NavGroup = (typeof NAV_GROUPS)[number]
+
 export type NavItem = {
   slug: string
+  group: NavGroup
   href: string
   label: string
   description: string
@@ -24,6 +29,7 @@ export type NavItem = {
 export const DASHBOARD_NAV: NavItem[] = [
   {
     slug: "",
+    group: "Workspace",
     href: "/dashboard",
     label: "Overview",
     description: "Your campaign at a glance",
@@ -33,6 +39,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "agent",
+    group: "Workspace",
     href: "/dashboard/agent",
     label: "AI Agent",
     description: "Brief and manage your AI marketing agents",
@@ -42,6 +49,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "posts",
+    group: "Content",
     href: "/dashboard/posts",
     label: "Posts",
     description: "Drafts, approvals and published content",
@@ -51,6 +59,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "inbox",
+    group: "Workspace",
     href: "/dashboard/inbox",
     label: "Inbox",
     description: "Comments and messages from your accounts",
@@ -60,6 +69,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "calendar",
+    group: "Content",
     href: "/dashboard/calendar",
     label: "Calendar",
     description: "Plan and schedule posts across channels",
@@ -69,6 +79,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "analytics",
+    group: "Insights",
     href: "/dashboard/analytics",
     label: "Analytics",
     description: "Reach, engagement and growth",
@@ -78,6 +89,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "accounts",
+    group: "Manage",
     href: "/dashboard/accounts",
     label: "Accounts",
     description: "Connected social media accounts",
@@ -87,6 +99,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   {
     slug: "settings",
+    group: "Manage",
     href: "/dashboard/settings",
     label: "Settings",
     description: "Campaign and workspace preferences",

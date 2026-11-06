@@ -7,14 +7,14 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, campaigns, activeCampaign } = await getDashboardContext()
-  // Icons-only until the user expands the sidebar; the choice is remembered
-  const sidebarOpen = (await cookies()).get("sidebar_state")?.value === "true"
+  // Open with labels unless the user collapsed it; the choice is remembered
+  const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false"
 
   return (
     <TooltipProvider delay={150}>
       <SidebarProvider
         defaultOpen={sidebarOpen}
-        style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "4.25rem" } as React.CSSProperties}
+        style={{ "--sidebar-width": "16rem", "--sidebar-width-icon": "4rem" } as React.CSSProperties}
         className="h-svh overflow-hidden"
       >
         <AppSidebar user={user} campaigns={campaigns} activeCampaignId={activeCampaign.id} />

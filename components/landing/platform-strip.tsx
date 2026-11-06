@@ -9,7 +9,7 @@ export function PlatformStrip() {
   const items = [...PLATFORMS, ...PLATFORMS]
 
   return (
-    <section className="border-y border-black/12 bg-night py-10 text-ink">
+    <section className="border-y border-foreground/12 bg-night/55 py-10 text-ink">
       <p className="text-center font-mono text-[11px] tracking-[0.14em] text-ink/55 uppercase">
         One team. Every platform your audience uses.
       </p>

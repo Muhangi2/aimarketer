@@ -57,7 +57,7 @@ export function ResearchVisual() {
               transition={{ duration: 0.6, ease }}
               className={cn(
                 "flex items-center justify-between rounded-2xl border px-4 py-3.5",
-                i === 0 ? "border-brand/50 bg-brand/15" : "border-black/12 bg-black/[0.03]"
+                i === 0 ? "border-brand/50 bg-brand/15" : "border-foreground/12 bg-foreground/[0.03]"
               )}
             >
               <span className="flex items-center gap-3 text-sm text-ink/75">
@@ -95,20 +95,20 @@ export function CreatorVisual() {
 
   return (
     <div ref={ref} className="relative w-full max-w-[320px]">
-      <div className="absolute -top-4 -right-6 rotate-6 rounded-xl border border-black/12 bg-black/[0.06] px-3 py-2 font-mono text-[10px] text-ink/75 backdrop-blur">
+      <div className="absolute -top-4 -right-6 rotate-6 rounded-xl border border-foreground/12 bg-foreground/[0.06] px-3 py-2 font-mono text-[10px] text-ink/75 backdrop-blur">
         tone: warm · playful
       </div>
-      <div className="rounded-[22px] bg-white p-3 text-ink shadow-[0_30px_80px_-20px_rgba(0,0,0,0.18)]">
+      <div className="rounded-[22px] bg-card p-3 text-ink ring-1 ring-border shadow-[0_30px_80px_-20px_rgba(0,0,0,0.18)]">
         <div className="flex items-center gap-2">
           <span className="size-7 rounded-full bg-linear-to-br from-brand-glow to-brand" />
           <span className="text-xs font-semibold">brewline.coffee</span>
           <span className="ml-auto rounded-full bg-brand-wash px-2 py-0.5 font-mono text-[10px] text-brand">draft</span>
         </div>
-        <div className="mt-3 aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">
+        <div className="mt-3 aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={unsplash("1509042239860-f550ce710b93", 640)} alt="" className="size-full object-cover" />
         </div>
-        <p className="mt-3 min-h-[3.75rem] text-[13px] leading-snug text-slate-700">
+        <p className="mt-3 min-h-[3.75rem] text-[13px] leading-snug text-foreground/80">
           {caption.slice(0, typed)}
           <span className="ml-0.5 inline-block h-3.5 w-px translate-y-0.5 animate-pulse bg-brand" />
         </p>
@@ -148,7 +148,7 @@ export function SchedulerVisual() {
               const index = SLOTS.findIndex((s) => s.day === d && s.row === row)
               const slot = index >= 0 ? SLOTS[index] : null
               return (
-                <div key={row} className="relative h-14 rounded-xl border border-black/[0.08] bg-black/[0.03]">
+                <div key={row} className="relative h-14 rounded-xl border border-foreground/[0.08] bg-foreground/[0.03]">
                   <AnimatePresence>
                     {slot && index < filled && (
                       <motion.div
@@ -187,7 +187,7 @@ export function AnalyticsVisual() {
   const growth = Math.round(((bars[6] - bars[5]) / bars[5]) * 100)
 
   return (
-    <div ref={ref} className="w-full max-w-[380px] rounded-[22px] border border-black/12 bg-black/[0.04] p-5">
+    <div ref={ref} className="w-full max-w-[380px] rounded-[22px] border border-foreground/12 bg-foreground/[0.04] p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="font-mono text-[10px] tracking-wider text-ink/55 uppercase">Engagement, last 7 days</p>
@@ -205,12 +205,12 @@ export function AnalyticsVisual() {
             transition={{ type: "spring", stiffness: 160, damping: 20, delay: i * 0.04 }}
             className={cn(
               "flex-1 rounded-t-lg",
-              i === bars.length - 1 ? "bg-linear-to-t from-brand to-brand-glow" : "bg-black/10"
+              i === bars.length - 1 ? "bg-linear-to-t from-brand to-brand-glow" : "bg-foreground/10"
             )}
           />
         ))}
       </div>
-      <p className="mt-4 rounded-xl bg-black/[0.05] px-3 py-2.5 text-xs text-ink/75">
+      <p className="mt-4 rounded-xl bg-foreground/[0.05] px-3 py-2.5 text-xs text-ink/75">
         Reels posted at 6 PM get twice the saves. Next week leans into reels.
       </p>
     </div>

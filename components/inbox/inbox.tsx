@@ -21,6 +21,7 @@ import { PlatformIcon } from "@/components/posts/platform-icon"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import type { CommentedPost, Conversation, InboxComment, InboxMessage } from "@/lib/zernio/client"
+import { toast } from "@/components/ui/toast"
 
 type Tab = "comments" | "messages"
 
@@ -70,16 +71,19 @@ function CommentItem({
   const [replying, setReplying] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Deleting asks for a second click inline instead of a browser popup
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const ids = { postId: post.id, accountId: post.accountId, commentId: comment.id }
 
   async function moderate(action: "hide" | "unhide" | "delete") {
-    if (action === "delete" && !confirm("Delete this comment? This can't be undone.")) return
+    setConfirmingDelete(false)
     setBusy(true)
     setError(null)
     const result = action === "delete" ? await deleteComment(ids) : await setCommentHidden(ids, action === "hide")
     setBusy(false)
-    if (!result.ok) setError(result.error)
-    else onChanged()
+    if (!result.ok) return setError(result.error)
+    toast.add({ title: action === "delete" ? "Comment deleted" : action === "hide" ? "Comment hidden" : "Comment visible again", type: "success" })
+    onChanged()
   }
 
   return (
@@ -104,11 +108,22 @@ function CommentItem({
                 {comment.isHidden ? <Eye data-icon="inline-start" /> : <EyeOff data-icon="inline-start" />} {comment.isHidden ? "Unhide" : "Hide"}
               </Button>
             )}
-            {comment.canDelete && (
-              <Button size="xs" variant="ghost" disabled={busy} onClick={() => moderate("delete")} className="text-destructive hover:text-destructive">
-                <Trash2 data-icon="inline-start" /> Delete
-              </Button>
-            )}
+            {comment.canDelete &&
+              (confirmingDelete ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 py-0.5 pr-0.5 pl-2.5 text-xs text-destructive">
+                  Delete for good?
+                  <Button size="xs" variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="xs" variant="destructive" disabled={busy} onClick={() => moderate("delete")}>
+                    Delete
+                  </Button>
+                </span>
+              ) : (
+                <Button size="xs" variant="ghost" disabled={busy} onClick={() => setConfirmingDelete(true)} className="text-destructive hover:text-destructive">
+                  <Trash2 data-icon="inline-start" /> Delete
+                </Button>
+              ))}
             {comment.url && (
               <a href={comment.url} target="_blank" rel="noreferrer" className="ml-1 text-muted-foreground hover:text-foreground" aria-label="Open on the platform">
                 <ExternalLink className="size-3" />
@@ -142,6 +157,7 @@ function CommentItem({
               const result = await replyToComment({ ...ids, message: text, requestId: newRequestId() })
               if (!result.ok) return result.error
               setReplying(false)
+              toast.add({ title: "Reply posted", type: "success" })
               onChanged()
               return null
             }}

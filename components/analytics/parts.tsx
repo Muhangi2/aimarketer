@@ -8,6 +8,8 @@ const full = new Intl.NumberFormat("en-US")
 
 /** 12.4K. A missing value is an em dash, never 0. */
 export const formatCompact = (n: number | null) => (n === null ? "—" : n < 10_000 ? full.format(Math.round(n)) : compact.format(n))
+// Short axis labels (7K, 10.5K) so they fit the narrow chart gutter
+export const formatAxis = (n: number) => (n < 1_000 ? String(Math.round(n)) : compact.format(n))
 export const formatFull = (n: number | null) => (n === null ? "—" : full.format(Math.round(n)))
 
 export function formatHours(minutes: number) {

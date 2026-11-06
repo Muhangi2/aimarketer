@@ -3,6 +3,7 @@ import { ArrowLeft, Check } from "lucide-react"
 import { Brand } from "@/components/brand"
 import { FeedWall } from "@/components/landing/feed-wall"
 import { LivePost } from "@/components/landing/live-post"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const POINTS = [
   "Five AI agents that research, write, publish and learn",
@@ -19,31 +20,34 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           <Link href="/" aria-label="Hively home">
             <Brand />
           </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-ink"
-          >
-            <ArrowLeft className="size-4" />
-            Back to home
-          </Link>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-ink"
+            >
+              <ArrowLeft className="size-4" />
+              Back to home
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-[400px]">{children}</div>
         </div>
 
-        <p className="text-xs text-slate-400">© {new Date().getFullYear()} Hively</p>
+        <p className="text-xs text-muted-foreground/80">© {new Date().getFullYear()} Hively</p>
       </div>
 
       <div className="relative hidden p-3 lg:block">
-        <div className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-black/[0.06] bg-night">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-foreground/[0.06] bg-night">
           <div className="relative z-10 p-10 pb-6">
             <h2 className="max-w-md text-4xl leading-[1.05] font-medium tracking-[-0.04em]">
               Your social media team, <span className="text-brand">ready when you are.</span>
             </h2>
             <ul className="mt-6 space-y-2.5">
               {POINTS.map((point) => (
-                <li key={point} className="flex items-center gap-2.5 text-[15px] text-slate-600">
+                <li key={point} className="flex items-center gap-2.5 text-[15px] text-muted-foreground">
                   <span className="flex size-5 items-center justify-center rounded-full bg-brand text-white">
                     <Check className="size-3" strokeWidth={3} />
                   </span>

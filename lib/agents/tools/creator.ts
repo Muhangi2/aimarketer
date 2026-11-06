@@ -9,7 +9,7 @@ import { errorText, memoryOf, pauseGate, setActivity, toolError, type Session } 
 
 /*
  * Creator Agent text tools: write_copy (posts, captions, hashtags, ideas) and save_content_draft
- * (to the content_draft table). The image tools are in ./images.
+ * (to the content_draft table). The image tools are in ./images, the video tool in ./video.
  */
 
 export function writeCopyTool(session: Session) {
@@ -56,7 +56,8 @@ export function saveDraftTool(session: Session) {
     errorFunction: toolError,
     name: "save_content_draft",
     needsApproval: pauseGate(session),
-    description: "Save one finished post, caption, thread, carousel, script, story, hashtag set or content idea as a draft in the database, with its images.",
+    description:
+      "Save one finished post, caption, thread, carousel, script, story, hashtag set or content idea as a draft in the database, with its images or its video.",
     parameters: z.object({
       platform: z.string().default("instagram"),
       format: z.enum(DRAFT_FORMATS).catch("post"),
@@ -65,16 +66,18 @@ export function saveDraftTool(session: Session) {
       hashtags: z.array(z.string()).default([]),
       call_to_action: z.string().nullable().default(null),
       image_urls: z.array(z.string()).default([]).describe("Image URLs from generate_image or edit_image"),
+      video_url: z.string().nullable().default(null).describe("The video URL from make_video. A post has images or one video, so the images are left out."),
       notes: z.string().nullable().default(null).describe("Posting notes, e.g. best time, alt text, music"),
     }),
     execute: async (input, ctx) => {
       const memory = memoryOf(ctx)
+      // A desktop path the agent forgot to upload
+      const stored = async (ref: string) => httpUrl(ref) ?? (await uploadFromDesktop(session, memory, ref, "uploaded"))
       const imageUrls: string[] = []
-      for (const ref of input.image_urls.slice(0, 20)) {
-        const url = httpUrl(ref)
-        // A desktop path the agent forgot to upload
-        imageUrls.push(url ?? (await uploadFromDesktop(session, memory, ref, "uploaded")))
-      }
+      // Platforms take images or a single video, not both
+      if (input.video_url?.trim()) imageUrls.push(await stored(input.video_url))
+      else for (const ref of input.image_urls.slice(0, 20)) imageUrls.push(await stored(ref))
+      const media = input.video_url?.trim() ? "1 video" : imageUrls.length ? `${imageUrls.length} image${imageUrls.length === 1 ? "" : "s"}` : null
       const draft = await session.outputs.addDraft({
         requestId: session.task.requestId,
         taskId: session.task.id,
@@ -89,7 +92,7 @@ export function saveDraftTool(session: Session) {
       })
       memory.drafts = [...(memory.drafts ?? []), draft.id]
       await setActivity(session, `Saved a draft: ${draft.title.slice(0, 60)}`)
-      return `Saved draft ${memory.drafts.length} (${draft.format} for ${draft.platform}${imageUrls.length ? `, ${imageUrls.length} image${imageUrls.length === 1 ? "" : "s"}` : ""}).`
+      return `Saved draft ${memory.drafts.length} (${draft.format} for ${draft.platform}${media ? `, ${media}` : ""}).`
     },
   })
 }

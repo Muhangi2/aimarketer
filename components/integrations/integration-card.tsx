@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
 import { PROVIDERS } from "@/lib/integrations/providers"
 import type { IntegrationConnection, IntegrationProvider } from "@/lib/integrations/types"
+import { toast } from "@/components/ui/toast"
 
 function KeyForm({ provider, submitLabel, onDone, onCancel }: { provider: IntegrationProvider; submitLabel: string; onDone: () => void; onCancel?: () => void }) {
   const info = PROVIDERS[provider]
@@ -44,6 +45,7 @@ function KeyForm({ provider, submitLabel, onDone, onCancel }: { provider: Integr
             return
           }
           setApiKey("")
+          toast.add({ title: `${info.name} connected`, type: "success" })
           onDone()
         })
       }}
@@ -233,6 +235,7 @@ export function IntegrationCard({ provider, connection }: { provider: Integratio
                   const result = await disconnectIntegration(provider)
                   setConfirmDisconnect(false)
                   if (!result.ok) setDisconnectError(result.error)
+                  else toast.add({ title: `${PROVIDERS[provider].name} disconnected`, type: "success" })
                   router.refresh()
                 })
               }

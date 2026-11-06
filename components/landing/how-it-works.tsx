@@ -49,7 +49,7 @@ export function HowItWorks() {
   const Icon = agent.icon
 
   return (
-    <section id="how-it-works" ref={ref} className="relative scroll-mt-0 bg-night text-ink" style={{ height: `${STEPS.length * 85 + 40}vh` }}>
+    <section id="how-it-works" ref={ref} className="relative scroll-mt-0 bg-night/55 text-ink" style={{ height: `${STEPS.length * 85 + 40}vh` }}>
       <div className="sticky top-0 flex h-[100svh] items-center overflow-hidden">
 
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
@@ -62,7 +62,7 @@ export function HowItWorks() {
                   key={s.title}
                   className={cn(
                     "rounded-full border px-3 py-1 font-mono text-[11px] uppercase transition-all duration-500",
-                    i === active ? "border-brand bg-brand text-white" : "border-black/12 text-ink/55"
+                    i === active ? "border-brand bg-brand text-white" : "border-foreground/12 text-ink/55"
                   )}
                 >
                   0{i + 1} {s.title}
@@ -91,13 +91,13 @@ export function HowItWorks() {
               </AnimatePresence>
             </div>
 
-            <div className="mt-10 h-px w-full max-w-md bg-black/10">
+            <div className="mt-10 h-px w-full max-w-md bg-foreground/10">
               <motion.div style={{ width: progress }} className="h-px bg-brand-glow" />
             </div>
           </div>
 
           {/* Plain white card for the live demo */}
-          <div className="relative flex h-[40svh] w-full items-center justify-center overflow-hidden rounded-[28px] border border-black/[0.06] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-10 lg:aspect-square lg:h-auto lg:max-h-[560px]">
+          <div className="relative flex h-[40svh] w-full items-center justify-center overflow-hidden rounded-[28px] border border-foreground/[0.06] bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-10 lg:aspect-square lg:h-auto lg:max-h-[560px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={active}

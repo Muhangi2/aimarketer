@@ -75,7 +75,7 @@ export function SectionHeading({
           className={cn(
             "mt-6 max-w-xl text-lg leading-relaxed text-pretty",
             center && "mx-auto",
-            dark ? "text-white/60" : "text-slate-600"
+            dark ? "text-white/60" : "text-muted-foreground"
           )}
         >
           {body}

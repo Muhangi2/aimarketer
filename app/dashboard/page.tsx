@@ -1,18 +1,22 @@
+import { CalendarClock, FileCheck2, Send, Sparkles } from "lucide-react"
 import { getDashboardContext } from "@/lib/dashboard"
 import { getOfficeScene } from "@/lib/office-scene"
 import { getWorkspaceSnapshot } from "@/lib/agents/snapshot"
 import { OverviewWorkspace } from "@/components/dashboard/overview-workspace"
 import {
-  CampaignStatusPanel,
+  OverviewHeader,
+  OverviewStats,
   RecentActivityPanel,
+  SetupChecklist,
   UpcomingPostsPanel,
   type ActivityItem,
+  type OverviewStat,
   type ScheduledPost,
 } from "@/components/dashboard/overview-panels"
 import type { RequestStatus } from "@/lib/agents/types"
 import { createInsForgeServerClient } from "@/lib/insforge/server"
 import { PLATFORMS, isPostPlatform } from "@/lib/posts/platforms"
-import { listUpcomingPosts } from "@/lib/posts/store"
+import { listPosts, listUpcomingPosts } from "@/lib/posts/store"
 
 const REQUEST_ACTIVITY: Record<RequestStatus, string> = {
   planning: "is planning",
@@ -27,20 +31,40 @@ const REQUEST_ACTIVITY: Record<RequestStatus, string> = {
 export default async function DashboardOverviewPage({ searchParams }: { searchParams: Promise<{ agent?: string }> }) {
   const { user, activeCampaign: campaign } = await getDashboardContext()
   const firstName = user.name.split(" ")[0]
-  const [officeScene, snapshot, { agent }, upcoming] = await Promise.all([
+  const insforge = await createInsForgeServerClient()
+  const [officeScene, snapshot, { agent }, upcoming, posts] = await Promise.all([
     getOfficeScene(campaign.office_image),
     getWorkspaceSnapshot(campaign.id, user.id),
     searchParams,
-    listUpcomingPosts(await createInsForgeServerClient(), campaign.id),
+    listUpcomingPosts(insforge, campaign.id, 8),
+    listPosts(insforge, campaign.id),
   ])
 
-  // Channels are not stored yet; wire them up once their table exists
+  const label = (p: string) => (isPostPlatform(p) ? PLATFORMS[p].label : p)
   const scheduledPosts: ScheduledPost[] = upcoming.map((p) => ({
     id: p.id,
     content: p.title,
-    channel: p.platforms.map((x) => (isPostPlatform(x) ? PLATFORMS[x].label : x)).join(", "),
+    channel: p.platforms.map(label).join(", "),
     scheduledAt: p.scheduledAt!,
+    image: p.media.find((m) => m.kind === "image")?.url ?? null,
   }))
+
+  const count = (...statuses: string[]) => posts.filter((p) => statuses.includes(p.status)).length
+  const published = count("published")
+  const toReview = count("draft", "pending")
+  const stats: OverviewStat[] = [
+    { label: "Scheduled", value: count("scheduled"), hint: "Ready to go out", href: "/dashboard/calendar", Icon: CalendarClock },
+    { label: "To review", value: toReview, hint: toReview ? "Drafts waiting for you" : "All caught up", href: "/dashboard/posts", Icon: FileCheck2 },
+    { label: "Published", value: published, hint: "Posts that went live", href: "/dashboard/posts", Icon: Send },
+    {
+      label: "AI drafts",
+      value: posts.filter((p) => p.source === "agent").length,
+      hint: "Written by your agents",
+      href: "/dashboard/posts",
+      Icon: Sparkles,
+    },
+  ]
+
   // Recent Master Agent requests double as the activity feed
   const activity: ActivityItem[] = snapshot.requests.slice(0, 5).map((r) => ({
     id: r.id,
@@ -50,10 +74,10 @@ export default async function DashboardOverviewPage({ searchParams }: { searchPa
   }))
 
   const steps = [
-    { label: "Create your first campaign", done: true },
-    { label: "Connect your social accounts", done: false },
-    { label: "Brief your AI agents", done: snapshot.requests.length > 0 },
-    { label: "Schedule your first post", done: scheduledPosts.length > 0 },
+    { label: "Create your first campaign", done: true, href: "/dashboard" },
+    { label: "Connect your social accounts", done: false, href: "/dashboard/accounts" },
+    { label: "Brief your AI agents", done: snapshot.requests.length > 0, href: "/dashboard/agent" },
+    { label: "Schedule your first post", done: scheduledPosts.length > 0 || published > 0, href: "/dashboard/posts/new" },
   ]
 
   return (
@@ -64,22 +88,16 @@ export default async function DashboardOverviewPage({ searchParams }: { searchPa
         userInitial={user.name.trim()[0]?.toUpperCase() ?? "U"}
         initialSelection={agent}
         snapshot={snapshot}
-        header={
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Welcome back, {firstName} 👋</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Here&apos;s what&apos;s happening with your campaign today.</p>
-          </div>
+        header={<OverviewHeader firstName={firstName} campaign={campaign} />}
+        stats={<OverviewStats stats={stats} />}
+        aside={
+          <>
+            <SetupChecklist steps={steps} />
+            <RecentActivityPanel activity={activity} />
+          </>
         }
       >
-        <CampaignStatusPanel
-          campaign={campaign}
-          steps={steps}
-          scheduledCount={scheduledPosts.length}
-          publishedCount={0}
-          channelCount={0}
-        />
         <UpcomingPostsPanel posts={scheduledPosts} />
-        <RecentActivityPanel activity={activity} />
       </OverviewWorkspace>
     </div>
   )

@@ -7,12 +7,13 @@ import { findNavItem } from "@/lib/dashboard-nav"
 import { UserAvatar } from "@/components/dashboard/user-menu"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function DashboardHeader({ user, campaignName }: { user: DashboardUser; campaignName: string }) {
   const item = findNavItem(usePathname())
 
   return (
-    <header className="sticky top-0 z-20 flex h-[72px] shrink-0 items-center gap-3 border-b border-black/[0.06] bg-background px-4 sm:px-8">
+    <header className="sticky top-0 z-20 flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-background/85 backdrop-blur-md px-4 sm:px-8">
       <SidebarTrigger className="-ml-1 size-9 rounded-full text-muted-foreground hover:text-foreground" />
       <span aria-hidden className="h-5 w-px bg-border" />
 
@@ -35,14 +36,15 @@ export function DashboardHeader({ user, campaignName }: { user: DashboardUser; c
         <input
           type="search"
           placeholder="Search…"
-          className="h-10 w-64 rounded-full border border-black/[0.08] bg-white pr-12 pl-10 text-sm transition-all outline-none placeholder:text-muted-foreground focus:w-72 focus:border-brand/40 focus:ring-3 focus:ring-brand/10"
+          className="h-10 w-64 rounded-full border border-border bg-card pr-12 pl-10 text-sm transition-all outline-none placeholder:text-muted-foreground focus:w-72 focus:border-brand/40 focus:ring-3 focus:ring-brand/10"
         />
         <kbd className="pointer-events-none absolute right-3 rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
           ⌘K
         </kbd>
       </label>
 
-      <Button variant="outline" size="icon" className="relative size-10 bg-white text-muted-foreground hover:text-foreground" aria-label="Notifications">
+      <ThemeToggle className="hidden sm:inline-flex" />
+      <Button variant="outline" size="icon" className="relative size-10 rounded-full bg-card text-muted-foreground hover:text-foreground" aria-label="Notifications">
         <Bell className="size-[18px]" />
         <span className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background" />
       </Button>

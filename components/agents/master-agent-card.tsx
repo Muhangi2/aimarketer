@@ -47,7 +47,8 @@ export function MasterAgentCard({
         className
       )}
     >
-      <div className={cn("rounded-[15px]", active ? "bg-accent/95" : "bg-card/95")}>
+      {/* Solid fills: a see-through fill lets the blue border gradient flood the card in dark mode */}
+      <div className={cn("rounded-[15px]", active ? "bg-[color-mix(in_oklab,var(--card),var(--brand)_10%)]" : "bg-card")}>
         <button
           type="button"
           role={compact ? "tab" : undefined}

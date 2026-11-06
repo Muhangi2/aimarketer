@@ -113,7 +113,7 @@ export function LivePost() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35, ease }}
-            className="flex items-center gap-2.5 rounded-full bg-ink py-1.5 pr-4 pl-1.5 text-sm text-white shadow-lg"
+            className="flex items-center gap-2.5 rounded-full bg-scrim py-1.5 pr-4 pl-1.5 text-sm text-white shadow-lg"
           >
             <span className="flex size-7 items-center justify-center rounded-full bg-brand">
               <AgentIcon className="size-3.5" />
@@ -132,7 +132,7 @@ export function LivePost() {
           // Finished posts fly up into the feed behind
           exit={{ opacity: 0, y: -120, x: 80, scale: 0.7, rotate: 6 }}
           transition={{ duration: 0.7, ease }}
-          className="relative rounded-[26px] bg-white p-3 text-ink shadow-[0_40px_80px_-30px_rgba(0,0,0,0.75)]"
+          className="relative rounded-[26px] bg-card p-3 text-ink shadow-[0_40px_80px_-30px_rgba(0,0,0,0.75)]"
         >
           <div className="flex items-center gap-2.5 px-1 pt-0.5 pb-3">
             <span className="size-8 rounded-full bg-linear-to-br from-brand-glow to-brand" />
@@ -147,10 +147,10 @@ export function LivePost() {
             </span>
           </div>
 
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100">
+          <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted">
             {/* Placeholder shimmer until the visual is "designed" */}
             {!reached("design") && (
-              <div className="absolute inset-0 animate-pulse bg-linear-to-br from-slate-100 to-slate-200" />
+              <div className="absolute inset-0 animate-pulse bg-linear-to-br from-muted to-muted-foreground/20" />
             )}
             <motion.img
               src={unsplash(post.image, 720)}
@@ -184,12 +184,12 @@ export function LivePost() {
             </AnimatePresence>
           </div>
 
-          <p className="mt-3 min-h-[2.75rem] px-1 text-sm leading-snug text-slate-700">
+          <p className="mt-3 min-h-[2.75rem] px-1 text-sm leading-snug text-foreground/80">
             {caption}
             {stage === "write" && <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-brand" />}
           </p>
 
-          <div className="mt-3 flex items-center gap-5 border-t border-slate-100 px-1 pt-3 text-sm text-slate-500">
+          <div className="mt-3 flex items-center gap-5 border-t border-border px-1 pt-3 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <Heart className={cn("size-4 transition-colors", reached("results") && "fill-brand text-brand")} />
               <NumberFlow value={reached("results") ? post.likes : 0} />
@@ -202,7 +202,7 @@ export function LivePost() {
 
           {/* One post, adapted and sent to every platform it suits */}
           <div className="mt-3 flex items-center gap-1.5 rounded-2xl bg-paper p-2">
-            <span className="mr-auto pl-1 font-mono text-[10px] text-slate-500 uppercase">
+            <span className="mr-auto pl-1 font-mono text-[10px] text-muted-foreground uppercase">
               {reached("publish") ? `Live on ${post.platforms.length}` : `Posting to ${post.platforms.length}`}
             </span>
             {post.platforms.map((key, i) => (
@@ -214,7 +214,7 @@ export function LivePost() {
                 transition={{ type: "spring", stiffness: 420, damping: 20, delay: reached("schedule") ? i * 0.18 : 0 }}
                 className={cn(
                   "flex size-7 items-center justify-center rounded-lg transition-colors duration-300",
-                  reached("schedule") ? "bg-ink text-white" : "bg-white text-slate-400"
+                  reached("schedule") ? "bg-foreground text-background" : "bg-card text-muted-foreground/80"
                 )}
               >
                 <PlatformIcon name={key} size={13} />

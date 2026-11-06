@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function UserAvatar({ user, className = "size-8" }: { user: DashboardUser; className?: string }) {
   const initials = user.name
@@ -74,6 +75,11 @@ export function UserMenu({ user }: { user: DashboardUser }) {
                 </span>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator className="my-1.5" />
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+              <span className="text-sm text-muted-foreground">Theme</span>
+              <ThemeToggle />
+            </div>
             <DropdownMenuSeparator className="my-1.5" />
             <DropdownMenuItem variant="destructive" className="rounded-lg p-2" onClick={() => signOut()}>
               <LogOut /> Sign out
